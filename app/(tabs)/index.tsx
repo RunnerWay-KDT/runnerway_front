@@ -1,98 +1,302 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from "react";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Flame, MapPin, TrendingUp, User, Heart } from "lucide-react-native";
+import Animated, { FadeInLeft, FadeInUp } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  Colors,
+  FontSize,
+  FontWeight,
+  Spacing,
+  BorderRadius,
+  Shadows,
+} from "../../constants/theme";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const recommendedRoutes = [
+    { name: "한강공원", distance: "5.2km", time: "30분", safety: 95 },
+    { name: "올림픽공원", distance: "3.8km", time: "22분", safety: 92 },
+    { name: "서울숲", distance: "4.5km", time: "26분", safety: 90 },
+  ];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>러너웨이</Text>
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => router.push("/(tabs)/profile")}
+        >
+          <User size={24} color={Colors.zinc[50]} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View entering={FadeInUp.duration(500)} style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            오늘은 어떤 운동을 하시겠어요?
+          </Text>
+
+          <View style={styles.mainButtonsRow}>
+            <TouchableOpacity
+              style={styles.mainButton}
+              activeOpacity={0.9}
+              onPress={() => router.push("/(screens)/running-setup")}
+            >
+              <LinearGradient
+                colors={[Colors.emerald[500], Colors.emerald[600]]}
+                style={styles.mainButtonGradient}
+              >
+                <Flame size={40} color="#fff" />
+                <View style={styles.mainButtonTextContainer}>
+                  <Text style={styles.mainButtonTitle}>러닝</Text>
+                  <Text style={styles.mainButtonSubtitle}>컨디션 맞춤</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.mainButton}
+              activeOpacity={0.9}
+              onPress={() => router.push("/(screens)/walking-setup")}
+            >
+              <LinearGradient
+                colors={[Colors.blue[500], Colors.blue[600]]}
+                style={styles.mainButtonGradient}
+              >
+                <TrendingUp size={40} color="#fff" />
+                <View style={styles.mainButtonTextContainer}>
+                  <Text style={styles.mainButtonTitle}>산책</Text>
+                  <Text style={styles.mainButtonSubtitle}>여유롭게</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.shapeButton}
+            activeOpacity={0.9}
+            onPress={() => router.push("/(screens)/shape-select")}
+          >
+            <LinearGradient
+              colors={[Colors.pink[500], Colors.purple[500]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.shapeButtonGradient}
+            >
+              <Heart size={32} color="#fff" />
+              <View style={styles.shapeButtonTextContainer}>
+                <Text style={styles.shapeButtonTitle}>그림 경로 만들기</Text>
+                <Text style={styles.shapeButtonSubtitle}>
+                  특별한 모양으로 러닝하기
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.recommendSection}>
+          <View style={styles.recommendHeader}>
+            <Text style={styles.recommendTitle}>오늘의 추천 경로</Text>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/community")}>
+              <Text style={styles.moreButton}>더보기</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recommendedRoutes.map((route, index) => (
+            <Animated.View
+              key={index}
+              entering={FadeInLeft.delay(index * 100).duration(400)}
+            >
+              <TouchableOpacity style={styles.routeCard} activeOpacity={0.8}>
+                <View style={styles.routeCardHeader}>
+                  <Text style={styles.routeName}>{route.name}</Text>
+                  <View style={styles.safetyBadge}>
+                    <MapPin size={12} color={Colors.emerald[400]} />
+                    <Text style={styles.safetyText}>
+                      안전도 {route.safety}%
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.routeCardInfo}>
+                  <Text style={styles.routeInfoText}>{route.distance}</Text>
+                  <Text style={styles.routeInfoDot}>•</Text>
+                  <Text style={styles.routeInfoText}>{route.time}</Text>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.zinc[950],
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.zinc[800],
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  headerTitle: {
+    fontSize: FontSize["2xl"],
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+  },
+  profileButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  scrollContent: {
+    paddingBottom: Spacing["2xl"],
+  },
+  section: {
+    padding: Spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: FontSize["2xl"],
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+    marginBottom: Spacing.lg,
+  },
+  mainButtonsRow: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  mainButton: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: BorderRadius["2xl"],
+    overflow: "hidden",
+    ...Shadows.lg,
+  },
+  mainButtonGradient: {
+    flex: 1,
+    padding: Spacing.lg,
+    justifyContent: "flex-end",
+  },
+  mainButtonTextContainer: {
+    marginTop: Spacing.md,
+  },
+  mainButtonTitle: {
+    fontSize: FontSize["2xl"],
+    fontWeight: FontWeight.bold,
+    color: "#fff",
+  },
+  mainButtonSubtitle: {
+    fontSize: FontSize.sm,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 2,
+  },
+  shapeButton: {
+    borderRadius: BorderRadius.xl,
+    overflow: "hidden",
+    ...Shadows.lg,
+  },
+  shapeButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  shapeButtonTextContainer: {
+    flex: 1,
+  },
+  shapeButtonTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: "#fff",
+  },
+  shapeButtonSubtitle: {
+    fontSize: FontSize.sm,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.zinc[800],
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.md,
+  },
+  recommendSection: {
+    paddingHorizontal: Spacing.lg,
+  },
+  recommendHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  recommendTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[50],
+  },
+  moreButton: {
+    fontSize: FontSize.sm,
+    color: Colors.emerald[500],
+  },
+  routeCard: {
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  routeCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  routeName: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[50],
+  },
+  safetyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  safetyText: {
+    fontSize: FontSize.xs,
+    color: Colors.emerald[400],
+  },
+  routeCardInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  routeInfoText: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+  },
+  routeInfoDot: {
+    color: Colors.zinc[400],
   },
 });
