@@ -1,11 +1,11 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface UserStats {
   totalDistance: number;
@@ -33,6 +33,10 @@ interface AuthContextType {
     name: string,
   ) => Promise<{ success: boolean }>;
   logout: () => Promise<void>;
+  updateProfile: (data: {
+    name?: string;
+    avatar?: string | null;
+  }) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -145,6 +149,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateProfile = async (data: {
+    name?: string;
+    avatar?: string | null;
+  }) => {
+    if (!user) return;
+
+    try {
+      // 실제 앱에서는 API 호출
+      // const response = await fetch('/api/v1/users/me', {
+      //   method: 'PATCH',
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify(data),
+      // });
+
+      const updatedUser: User = {
+        ...user,
+        name: data.name !== undefined ? data.name : user.name,
+        avatar: data.avatar !== undefined ? data.avatar : user.avatar,
+      };
+
+      setUser(updatedUser);
+      await saveUserToStorage(updatedUser);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -152,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loginWithSocial,
     signup,
     logout,
+    updateProfile,
     isAuthenticated: !!user,
   };
 

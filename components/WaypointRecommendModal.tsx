@@ -1,32 +1,32 @@
+import {
+  Camera,
+  Check,
+  Clock,
+  Coffee,
+  MapPin,
+  Navigation,
+  Star,
+  Store,
+  Trees,
+  X,
+} from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   Modal,
-  TouchableOpacity,
-  ScrollView,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import {
-  Coffee,
-  Store,
-  Trees,
-  Camera,
-  X,
-  Check,
-  MapPin,
-  Star,
-  Clock,
-  Navigation,
-} from "lucide-react-native";
-import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../constants/theme";
 
 interface Place {
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: "100%",
-    maxHeight: "90%",
+    maxHeight: "85%",
     backgroundColor: Colors.zinc[900],
     borderRadius: BorderRadius["2xl"],
     overflow: "hidden",
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
   placeList: {
-    flex: 1,
+    maxHeight: 400,
     padding: Spacing.md,
   },
   placeCard: {

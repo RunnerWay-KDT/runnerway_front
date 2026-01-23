@@ -1,24 +1,24 @@
 import React from "react";
 
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Flame, MapPin, TrendingUp, User, Heart } from "lucide-react-native";
-import Animated, { FadeInLeft, FadeInUp } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { Flame, Heart, MapPin, TrendingUp, User } from "lucide-react-native";
 import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Animated, { FadeInLeft, FadeInUp } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
-  Spacing,
-  BorderRadius,
   Shadows,
+  Spacing,
 } from "../../constants/theme";
 
 export default function HomeScreen() {
@@ -106,6 +106,26 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.savedRouteButton}
+            activeOpacity={0.9}
+            onPress={() => router.push("/(screens)/route-select")}
+          >
+            <View style={styles.savedRouteButtonContent}>
+              <Heart
+                size={24}
+                color={Colors.emerald[400]}
+                fill={Colors.emerald[400]}
+              />
+              <View style={styles.savedRouteTextContainer}>
+                <Text style={styles.savedRouteTitle}>저장된 경로에서 시작</Text>
+                <Text style={styles.savedRouteSubtitle}>
+                  내가 저장한 경로 또는 새로 만들기
+                </Text>
+              </View>
+            </View>
           </TouchableOpacity>
         </Animated.View>
 
@@ -235,6 +255,33 @@ const styles = StyleSheet.create({
   shapeButtonSubtitle: {
     fontSize: FontSize.sm,
     color: "rgba(255,255,255,0.8)",
+    marginTop: 4,
+  },
+  savedRouteButton: {
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.zinc[900],
+    borderWidth: 2,
+    borderColor: Colors.emerald[500] + "30",
+    overflow: "hidden",
+  },
+  savedRouteButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  savedRouteTextContainer: {
+    flex: 1,
+  },
+  savedRouteTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[100],
+  },
+  savedRouteSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[500],
     marginTop: 4,
   },
   divider: {
