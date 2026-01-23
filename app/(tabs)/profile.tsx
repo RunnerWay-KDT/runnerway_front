@@ -1,36 +1,35 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  User,
-  Settings,
-  Trophy,
-  MapPin,
-  TrendingUp,
+  ChevronRight,
   Heart,
   LogOut,
-  ChevronRight,
-  Bell,
+  MapPin,
+  Settings,
   Shield,
+  TrendingUp,
+  Trophy,
+  User,
 } from "lucide-react-native";
-import Animated, { FadeInUp, FadeInLeft } from "react-native-reanimated";
-import { useAuth } from "../../contexts/AuthContext";
+import React from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Animated, { FadeInLeft, FadeInUp } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../../constants/theme";
-import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -58,17 +57,22 @@ export default function ProfileScreen() {
   ];
 
   const menuItems = [
-    { Icon: User, label: "프로필 수정" },
-    { Icon: Trophy, label: "내 기록" },
-    { Icon: Heart, label: "저장한 경로" },
-    { Icon: Bell, label: "알림 설정" },
-    { Icon: Shield, label: "안전 설정" },
-    { Icon: Settings, label: "앱 설정" },
+    { Icon: User, label: "프로필 수정", route: "/(screens)/profile-edit" },
+    { Icon: Trophy, label: "내 기록", route: "/(screens)/workout-history" },
+    { Icon: Heart, label: "저장한 경로", route: "/(screens)/saved-routes" },
+    { Icon: Shield, label: "안전 설정", route: "/(screens)/safety-settings" },
+    { Icon: Settings, label: "앱 설정", route: "/(screens)/app-settings" },
   ];
 
   const handleLogout = async () => {
     await logout();
     router.replace("/(auth)/login");
+  };
+
+  const handleMenuPress = (route: string | null) => {
+    if (route) {
+      router.push(route as any);
+    }
   };
 
   const getUserInitial = () => {
@@ -147,7 +151,11 @@ export default function ProfileScreen() {
                 key={i}
                 entering={FadeInLeft.delay(300 + i * 50).duration(400)}
               >
-                <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleMenuPress(item.route)}
+                >
                   <View style={styles.menuItemLeft}>
                     <Icon size={20} color={Colors.zinc[400]} />
                     <Text style={styles.menuItemText}>{item.label}</Text>

@@ -1,27 +1,28 @@
+import { Bookmark, Heart, MapPin, MessageCircle } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Heart, MessageCircle, Bookmark, MapPin } from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { PostDetailModal } from "../../components/PostDetailModal";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import {
   Tabs,
+  TabsContent,
   TabsList,
   TabsTrigger,
-  TabsContent,
 } from "../../components/ui/Tabs";
 import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../../constants/theme";
 
 interface Route {
@@ -82,6 +83,11 @@ const shapeEmoji: Record<string, string> = {
 
 export default function CommunityScreen() {
   const [likedRoutes, setLikedRoutes] = useState<Set<number>>(new Set());
+  const [bookmarkedRoutes, setBookmarkedRoutes] = useState<Set<number>>(
+    new Set(),
+  );
+  const [selectedPost, setSelectedPost] = useState<Route | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const toggleLike = (id: number) => {
     setLikedRoutes((prev) => {
@@ -95,58 +101,103 @@ export default function CommunityScreen() {
     });
   };
 
+  const toggleBookmark = (id: number) => {
+    setBookmarkedRoutes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePostPress = (route: Route) => {
+    setSelectedPost(route);
+    setIsModalVisible(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+    setSelectedPost(null);
+  };
+
   const RouteCard = ({ route }: { route: Route }) => {
     const isLiked = likedRoutes.has(route.id);
+    const isBookmarked = bookmarkedRoutes.has(route.id);
 
     return (
       <Animated.View entering={FadeInUp.duration(400)}>
-        <View style={styles.card}>
-          <View style={styles.cardImage}>
-            <Text style={styles.shapeEmoji}>{shapeEmoji[route.shape]}</Text>
-            <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>{route.distance}</Text>
-            </View>
-            <TouchableOpacity style={styles.bookmarkButton} activeOpacity={0.7}>
-              <Bookmark size={20} color={Colors.zinc[50]} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.cardContent}>
-            <View style={styles.userRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{route.user[0]}</Text>
+        <TouchableOpacity
+          onPress={() => handlePostPress(route)}
+          activeOpacity={0.9}
+        >
+          <View style={styles.card}>
+            <View style={styles.cardImage}>
+              <Text style={styles.shapeEmoji}>{shapeEmoji[route.shape]}</Text>
+              <View style={styles.distanceBadge}>
+                <Text style={styles.distanceText}>{route.distance}</Text>
               </View>
-              <Text style={styles.userName}>{route.user}</Text>
-            </View>
-
-            <View style={styles.locationRow}>
-              <MapPin size={16} color={Colors.zinc[400]} />
-              <Text style={styles.locationText}>{route.location}</Text>
-            </View>
-
-            <View style={styles.actionsRow}>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleLike(route.id)}
+                style={styles.bookmarkButton}
                 activeOpacity={0.7}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleBookmark(route.id);
+                }}
               >
-                <Heart
+                <Bookmark
                   size={20}
-                  color={isLiked ? Colors.red[500] : Colors.zinc[50]}
-                  fill={isLiked ? Colors.red[500] : "transparent"}
+                  color={isBookmarked ? Colors.amber[500] : Colors.zinc[50]}
+                  fill={isBookmarked ? Colors.amber[500] : "transparent"}
                 />
-                <Text style={styles.actionText}>
-                  {route.likes + (isLiked ? 1 : 0)}
-                </Text>
               </TouchableOpacity>
+            </View>
 
-              <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                <MessageCircle size={20} color={Colors.zinc[50]} />
-                <Text style={styles.actionText}>{route.comments}</Text>
-              </TouchableOpacity>
+            <View style={styles.cardContent}>
+              <View style={styles.userRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{route.user[0]}</Text>
+                </View>
+                <Text style={styles.userName}>{route.user}</Text>
+              </View>
+
+              <View style={styles.locationRow}>
+                <MapPin size={16} color={Colors.zinc[400]} />
+                <Text style={styles.locationText}>{route.location}</Text>
+              </View>
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleLike(route.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Heart
+                    size={20}
+                    color={isLiked ? Colors.red[500] : Colors.zinc[50]}
+                    fill={isLiked ? Colors.red[500] : "transparent"}
+                  />
+                  <Text style={styles.actionText}>
+                    {route.likes + (isLiked ? 1 : 0)}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  activeOpacity={0.7}
+                >
+                  <MessageCircle size={20} color={Colors.zinc[50]} />
+                  <Text style={styles.actionText}>{route.comments}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </Animated.View>
     );
   };
@@ -197,6 +248,42 @@ export default function CommunityScreen() {
           </View>
         </TabsContent>
       </Tabs>
+
+      {selectedPost && (
+        <PostDetailModal
+          visible={isModalVisible}
+          onClose={handleCloseModal}
+          post={{
+            id: selectedPost.id.toString(),
+            author: {
+              id: selectedPost.id.toString(),
+              name: selectedPost.user,
+              avatar: selectedPost.user[0],
+            },
+            route: {
+              name: `${selectedPost.shape} 러닝 코스`,
+              shapeId: selectedPost.shape.toLowerCase(),
+              shapeName: selectedPost.shape,
+              iconName: selectedPost.shape.toLowerCase(),
+              distance: parseFloat(selectedPost.distance),
+              duration: 45,
+              pace: "5'30\"",
+              calories: 350,
+            },
+            location: selectedPost.location,
+            caption: `${selectedPost.shape} 모양으로 달렸습니다! 날씨도 좋고 정말 상쾌한 러닝이었어요 😊`,
+            likes:
+              selectedPost.likes + (likedRoutes.has(selectedPost.id) ? 1 : 0),
+            comments: selectedPost.comments,
+            bookmarks: 0,
+            isLiked: likedRoutes.has(selectedPost.id),
+            isBookmarked: bookmarkedRoutes.has(selectedPost.id),
+            createdAt: new Date().toISOString(),
+          }}
+          onLike={() => toggleLike(selectedPost.id)}
+          onBookmark={() => toggleBookmark(selectedPost.id)}
+        />
+      )}
     </SafeAreaView>
   );
 }

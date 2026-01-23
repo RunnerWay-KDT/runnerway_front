@@ -1,31 +1,31 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  MapPin,
-  Clock,
-  Shield,
-  TrendingUp,
   ArrowLeft,
-  Sparkles,
-  Navigation,
-  Users,
-  Store,
-  Star,
   Check,
+  Clock,
+  MapPin,
+  Navigation,
+  Shield,
+  Sparkles,
+  Star,
+  Store,
+  TrendingUp,
+  Users,
 } from "lucide-react-native";
+import React, { useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
-import { MapMock } from "../../components/MapMock";
 import { BottomSheet } from "../../components/BottomSheet";
+import { MapMock } from "../../components/MapMock";
 import { PrimaryButton } from "../../components/PrimaryButton";
-import { getIconComponent } from "../../utils/shapeIcons";
 import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../../constants/theme";
+import { getIconComponent } from "../../utils/shapeIcons";
 
 interface RouteOption {
   id: number;
@@ -51,16 +51,22 @@ export default function RoutePreviewScreen() {
   >("half");
 
   const isCustomDrawing = params.mode === "custom";
-  const iconName = (params.shapeIconName as string) || "heart";
+  const fromSaved = params.fromSaved === "true";
+  const iconName =
+    (params.shapeIconName as string) || (params.shapeId as string) || "heart";
   const shapeName = (params.shapeName as string) || "하트";
+  const savedRouteName = params.routeName as string;
 
   const generateRouteOptions = (): RouteOption[] => {
-    const baseDistance = parseFloat((params.shapeDistance as string) || "4.2");
+    const baseDistance = parseFloat(
+      (params.shapeDistance as string) || (params.distance as string) || "4.2",
+    );
 
     return [
       {
         id: 1,
-        name: `${shapeName} 경로 A`,
+        name:
+          fromSaved && savedRouteName ? savedRouteName : `${shapeName} 경로 A`,
         distance: `${(baseDistance * 0.8).toFixed(1)}km`,
         estimatedTime: Math.round(baseDistance * 0.8 * 7),
         safety: 95,
@@ -71,11 +77,14 @@ export default function RoutePreviewScreen() {
         rating: 4.9,
         runners: 203,
         difficulty: "쉬움",
-        tag: "추천",
+        tag: fromSaved ? null : "추천",
       },
       {
         id: 2,
-        name: `${shapeName} 경로 B`,
+        name:
+          fromSaved && savedRouteName
+            ? `${savedRouteName} - 대체 경로`
+            : `${shapeName} 경로 B`,
         distance: `${baseDistance.toFixed(1)}km`,
         estimatedTime: Math.round(baseDistance * 7),
         safety: 88,
@@ -86,11 +95,14 @@ export default function RoutePreviewScreen() {
         rating: 4.8,
         runners: 142,
         difficulty: "보통",
-        tag: "BEST",
+        tag: fromSaved ? null : "BEST",
       },
       {
         id: 3,
-        name: `${shapeName} 경로 C`,
+        name:
+          fromSaved && savedRouteName
+            ? `${savedRouteName} - 긴 코스`
+            : `${shapeName} 경로 C`,
         distance: `${(baseDistance * 1.2).toFixed(1)}km`,
         estimatedTime: Math.round(baseDistance * 1.2 * 7),
         safety: 84,
@@ -150,7 +162,9 @@ export default function RoutePreviewScreen() {
         >
           <ArrowLeft size={24} color={Colors.zinc[900]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>경로 선택</Text>
+        <Text style={styles.headerTitle}>
+          {fromSaved ? "저장된 경로" : "경로 선택"}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
