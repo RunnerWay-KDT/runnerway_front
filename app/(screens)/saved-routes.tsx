@@ -1,5 +1,11 @@
 import { useRouter } from "expo-router";
-import { ArrowUpDown, Heart, MapPin, Shield, User } from "lucide-react-native";
+import {
+  ArrowUpDown,
+  Bookmark,
+  MapPin,
+  Shield,
+  User,
+} from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Alert,
@@ -290,10 +296,10 @@ export default function SavedRoutesScreen() {
                 onPress={() => handleUnsave(item.id, item.routeName)}
                 activeOpacity={0.7}
               >
-                <Heart
+                <Bookmark
                   size={20}
-                  color={Colors.red[500]}
-                  fill={Colors.red[500]}
+                  color={Colors.emerald[500]}
+                  fill={Colors.emerald[500]}
                   strokeWidth={2}
                 />
               </TouchableOpacity>
@@ -335,7 +341,7 @@ export default function SavedRoutesScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
-        <Heart size={64} color={Colors.zinc[700]} />
+        <Bookmark size={64} color={Colors.zinc[700]} />
       </View>
       <Text style={styles.emptyTitle}>저장한 경로가 없습니다</Text>
       <Text style={styles.emptySubtitle}>

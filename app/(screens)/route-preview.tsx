@@ -7,10 +7,8 @@ import {
   Navigation,
   Shield,
   Sparkles,
-  Star,
   Store,
   TrendingUp,
-  Users,
 } from "lucide-react-native";
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -37,8 +35,6 @@ interface RouteOption {
   lighting: number;
   sidewalk: number;
   convenience: number;
-  rating: number;
-  runners: number;
   difficulty: string;
   tag: string | null;
 }
@@ -74,8 +70,6 @@ export default function RoutePreviewScreen() {
         lighting: 92,
         sidewalk: 96,
         convenience: 5,
-        rating: 4.9,
-        runners: 203,
         difficulty: "쉬움",
         tag: fromSaved ? null : "추천",
       },
@@ -92,8 +86,6 @@ export default function RoutePreviewScreen() {
         lighting: 87,
         sidewalk: 92,
         convenience: 3,
-        rating: 4.8,
-        runners: 142,
         difficulty: "보통",
         tag: fromSaved ? null : "BEST",
       },
@@ -110,8 +102,6 @@ export default function RoutePreviewScreen() {
         lighting: 80,
         sidewalk: 85,
         convenience: 2,
-        rating: 4.5,
-        runners: 98,
         difficulty: "도전",
         tag: null,
       },
@@ -330,21 +320,9 @@ export default function RoutePreviewScreen() {
                     </View>
                     <View style={styles.routeOptionStats}>
                       <View style={styles.routeOptionStat}>
-                        <Star size={12} color={Colors.amber[400]} />
-                        <Text style={styles.routeOptionStatText}>
-                          {route.rating}
-                        </Text>
-                      </View>
-                      <View style={styles.routeOptionStat}>
-                        <Users size={12} color={Colors.blue[400]} />
-                        <Text style={styles.routeOptionStatText}>
-                          {route.runners}명
-                        </Text>
-                      </View>
-                      <View style={styles.routeOptionStat}>
                         <Shield size={12} color={Colors.purple[400]} />
                         <Text style={styles.routeOptionStatText}>
-                          {route.safety}점
+                          안전도 {route.safety}점
                         </Text>
                       </View>
                     </View>
@@ -402,12 +380,8 @@ export default function RoutePreviewScreen() {
                 </Text>
               </View>
             </View>
-          </Animated.View>
-        )}
 
-        {/* Expanded Content */}
-        {sheetState === "expanded" && (
-          <Animated.View entering={FadeInUp.delay(200).duration(300)}>
+            {/* 주변 편의시설 - half 상태에서도 보이도록 수정 */}
             <View style={styles.divider} />
 
             <View style={styles.sectionHeader}>

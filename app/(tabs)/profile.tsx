@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
+  Bookmark,
   ChevronRight,
   Heart,
   LogOut,
@@ -59,7 +60,7 @@ export default function ProfileScreen() {
   const menuItems = [
     { Icon: User, label: "프로필 수정", route: "/(screens)/profile-edit" },
     { Icon: Trophy, label: "내 기록", route: "/(screens)/workout-history" },
-    { Icon: Heart, label: "저장한 경로", route: "/(screens)/saved-routes" },
+    { Icon: Bookmark, label: "저장한 경로", route: "/(screens)/saved-routes" },
     { Icon: Shield, label: "안전 설정", route: "/(screens)/safety-settings" },
     { Icon: Settings, label: "앱 설정", route: "/(screens)/app-settings" },
   ];

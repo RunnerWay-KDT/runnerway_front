@@ -1,29 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  Flame,
   Pause,
   Play,
   Square,
+  TrendingUp,
   Volume2,
   VolumeX,
-  TrendingUp,
-  Flame,
 } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
   FadeInUp,
-  useSharedValue,
   useAnimatedStyle,
+  useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { LiveMapMock } from "../../components/LiveMapMock";
 import { BottomSheet } from "../../components/BottomSheet";
+import { LiveMapMock } from "../../components/LiveMapMock";
 import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../../constants/theme";
 
 export default function WorkoutScreen() {
@@ -45,6 +45,7 @@ export default function WorkoutScreen() {
   const progress = Math.min(distance / targetDistance, 1);
   const progressWidth = useSharedValue(0);
 
+  // 진행률 애니메이션
   useEffect(() => {
     progressWidth.value = withTiming(progress * 100, { duration: 300 });
   }, [progress, progressWidth]);
@@ -53,25 +54,36 @@ export default function WorkoutScreen() {
     width: `${progressWidth.value}%`,
   }));
 
+  // 타이머 로직 개선 - time 의존성 제거하고 함수형 업데이트 사용
   useEffect(() => {
     if (!isPaused) {
       const interval = setInterval(() => {
-        setTime((t) => t + 1);
-        setDistance((d) => {
-          const newDistance = d + 0.002;
+        setTime((prevTime) => {
+          const newTime = prevTime + 1;
+          return newTime;
+        });
+
+        setDistance((prevDistance) => {
+          const newDistance = prevDistance + 0.002;
+
+          // 페이스 계산을 여기서 직접 수행
           if (newDistance > 0) {
-            const currentTime = time + 1;
-            const currentPace = currentTime / 60 / newDistance;
-            const mins = Math.floor(currentPace);
-            const secs = Math.round((currentPace - mins) * 60);
-            setPace(`${mins}'${secs.toString().padStart(2, "0")}"`);
+            setTime((currentTime) => {
+              const currentPace = currentTime / 60 / newDistance;
+              const mins = Math.floor(currentPace);
+              const secs = Math.round((currentPace - mins) * 60);
+              setPace(`${mins}'${secs.toString().padStart(2, "0")}"`);
+              return currentTime;
+            });
           }
+
           return newDistance;
         });
       }, 1000);
+
       return () => clearInterval(interval);
     }
-  }, [isPaused, time]);
+  }, [isPaused]); // time 제거
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -203,12 +215,8 @@ export default function WorkoutScreen() {
               <Text style={styles.calorieValue}>{calories}</Text>
               <Text style={styles.calorieUnit}>kcal</Text>
             </View>
-          </Animated.View>
-        )}
 
-        {/* Expanded State - Detailed Info */}
-        {sheetState === "expanded" && (
-          <Animated.View entering={FadeInUp.delay(200).duration(300)}>
+            {/* 구간 기록 - half 상태에서도 보이도록 수정 */}
             <View style={styles.divider} />
 
             <View style={styles.sectionHeader}>
