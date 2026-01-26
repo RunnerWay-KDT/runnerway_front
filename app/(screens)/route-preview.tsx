@@ -14,7 +14,7 @@ import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { BottomSheet } from "../../components/BottomSheet";
-import { MapMock } from "../../components/MapMock";
+import { KakaoMap } from "../../components/KakaoMap";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import {
   BorderRadius,
@@ -141,7 +141,7 @@ export default function RoutePreviewScreen() {
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <MapMock routePath={iconName} />
+      <KakaoMap routePath={iconName} />
 
       {/* Header */}
       <View style={styles.header}>

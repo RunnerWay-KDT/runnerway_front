@@ -1,31 +1,32 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Clock,
-  TrendingUp,
+  Download,
   Flame,
   Share2,
-  Download,
-  Trophy,
   Sparkles,
+  TrendingUp,
+  Trophy,
 } from "lucide-react-native";
-import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
-import { PrimaryButton } from "../../components/PrimaryButton";
-import { getIconComponent } from "../../utils/shapeIcons";
+import React from "react";
 import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
+import { KakaoMap } from "../../components/KakaoMap";
+import { PrimaryButton } from "../../components/PrimaryButton";
+import {
+  BorderRadius,
   Colors,
   FontSize,
   FontWeight,
   Spacing,
-  BorderRadius,
 } from "../../constants/theme";
+import { getIconComponent } from "../../utils/shapeIcons";
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -96,6 +97,14 @@ export default function ResultScreen() {
       >
         훌륭한 러닝이었습니다
       </Animated.Text>
+
+      {/* Map Section */}
+      <Animated.View
+        entering={FadeInUp.delay(450).duration(400)}
+        style={styles.mapContainer}
+      >
+        <KakaoMap routePath={iconName} />
+      </Animated.View>
 
       {/* Route Card */}
       <Animated.View
@@ -234,6 +243,16 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     color: Colors.zinc[400],
     marginBottom: Spacing.xl,
+  },
+  mapContainer: {
+    width: "100%",
+    height: 250,
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius["2xl"],
+    borderWidth: 1,
+    borderColor: Colors.zinc[800],
+    overflow: "hidden",
+    marginBottom: Spacing.lg,
   },
   routeCard: {
     width: "100%",

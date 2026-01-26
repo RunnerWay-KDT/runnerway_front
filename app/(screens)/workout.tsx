@@ -17,7 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { BottomSheet } from "../../components/BottomSheet";
-import { LiveMapMock } from "../../components/LiveMapMock";
+import { LiveKakaoMap } from "../../components/LiveKakaoMap";
 import {
   BorderRadius,
   Colors,
@@ -112,7 +112,7 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <LiveMapMock routePath={iconName} progress={progress} />
+      <LiveKakaoMap routePath={iconName} progress={progress} />
 
       {/* Top Controls */}
       <View style={styles.header}>
