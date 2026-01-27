@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+API_SPECIFICATION_V2.csv
+DB_TABLE_DEFINITION.csv
+FUNCTION_SPECIFICATION.csv
+
 # Expo
 .expo/
 dist/
