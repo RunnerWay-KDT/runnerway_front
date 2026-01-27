@@ -55,7 +55,12 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.mainButton}
               activeOpacity={0.9}
-              onPress={() => router.push("/(screens)/running-setup")}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/location-setup",
+                  params: { workoutType: "running" },
+                })
+              }
             >
               <LinearGradient
                 colors={[Colors.emerald[500], Colors.emerald[600]]}
@@ -72,7 +77,12 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.mainButton}
               activeOpacity={0.9}
-              onPress={() => router.push("/(screens)/walking-setup")}
+              onPress={() =>
+                router.push({
+                  pathname: "/(screens)/location-setup",
+                  params: { workoutType: "walking" },
+                })
+              }
             >
               <LinearGradient
                 colors={[Colors.blue[500], Colors.blue[600]]}
@@ -90,7 +100,12 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.shapeButton}
             activeOpacity={0.9}
-            onPress={() => router.push("/(screens)/shape-select")}
+            onPress={() =>
+              router.push({
+                pathname: "/(screens)/location-setup",
+                params: { workoutType: "shape" },
+              })
+            }
           >
             <LinearGradient
               colors={[Colors.pink[500], Colors.purple[500]]}

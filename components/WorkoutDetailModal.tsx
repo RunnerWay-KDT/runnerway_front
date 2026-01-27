@@ -27,7 +27,7 @@ import {
   Spacing,
 } from "../constants/theme";
 import { getIconComponent } from "../utils/shapeIcons";
-import { MapMock } from "./MapMock";
+import { KakaoMap } from "./KakaoMap";
 
 const { height } = Dimensions.get("window");
 
@@ -194,7 +194,7 @@ export function WorkoutDetailModal({
             {/* 지도 영역 */}
             <View style={styles.mapSection}>
               <View style={styles.mapContainer}>
-                <MapMock routePath={workout.routeData.shapeId} />
+                <KakaoMap routePath={workout.routeData.shapeId} />
               </View>
               <LinearGradient
                 colors={["transparent", Colors.zinc[950]]}
