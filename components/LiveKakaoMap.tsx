@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -94,8 +100,8 @@ export function LiveKakaoMap({
   const routePolyline =
     polyline.length > 0 ? polyline : getRoutePolyline(routePath);
 
-  // 진행률에 따른 현재 위치 계산
-  const calculateCurrentPosition = () => {
+  // 진행률에 따른 현재 위치 계산 - useCallback으로 메모이제이션
+  const calculateCurrentPosition = useCallback(() => {
     if (currentPosition) return currentPosition;
 
     if (routePolyline.length < 2)
@@ -113,13 +119,20 @@ export function LiveKakaoMap({
       lat: current.lat + (next.lat - current.lat) * localProgress,
       lng: current.lng + (next.lng - current.lng) * localProgress,
     };
-  };
+  }, [currentPosition, routePolyline, progress, center]);
 
-  const currentPos = calculateCurrentPosition();
+  // 초기 위치 (HTML 생성용) - 한 번만 계산
+  const initialPos = useMemo(() => {
+    if (currentPosition) return currentPosition;
+    if (routePolyline.length < 2)
+      return routePolyline[0] || { lat: center.lat, lng: center.lng };
+    return routePolyline[0];
+  }, [currentPosition, routePolyline, center]);
 
   // 진행률이 변경될 때마다 지도 업데이트
   useEffect(() => {
     if (webViewRef.current && isMapReady) {
+      const currentPos = calculateCurrentPosition();
       webViewRef.current.postMessage(
         JSON.stringify({
           type: "updatePosition",
@@ -128,9 +141,11 @@ export function LiveKakaoMap({
         }),
       );
     }
-  }, [progress, currentPos, isMapReady]);
+  }, [progress, isMapReady, calculateCurrentPosition]);
 
-  const htmlContent = `
+  // HTML 콘텐츠를 한 번만 생성 (재렌더링 방지)
+  const htmlContent = useMemo(
+    () => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -274,7 +289,7 @@ export function LiveKakaoMap({
         markerContainer.innerHTML = '<div class="pulse-ring"></div><div class="current-marker"></div>';
 
         currentMarker = new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(${currentPos.lat}, ${currentPos.lng}),
+          position: new kakao.maps.LatLng(${initialPos.lat}, ${initialPos.lng}),
           content: markerContainer,
           zIndex: 20
         });
@@ -332,7 +347,10 @@ export function LiveKakaoMap({
   </script>
 </body>
 </html>
-  `;
+  `,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
     <View style={styles.container}>

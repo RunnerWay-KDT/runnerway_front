@@ -47,6 +47,8 @@ module.exports = {
     extra: {
       // 환경 변수를 통해 Kakao Map API 키 전달
       kakaoMapAppKey: process.env.EXPO_PUBLIC_KAKAO_MAP_APP_KEY,
+      // REST API 키 (리버스 지오코딩용)
+      kakaoRestApiKey: process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY,
     },
   },
 };

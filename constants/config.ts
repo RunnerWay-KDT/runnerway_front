@@ -23,9 +23,29 @@ const getKakaoApiKey = (): string => {
   return apiKey;
 };
 
+// REST API 키 가져오기 (리버스 지오코딩용)
+const getKakaoRestApiKey = (): string => {
+  const restApiKey =
+    Constants.expoConfig?.extra?.kakaoRestApiKey ||
+    process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
+
+  if (!restApiKey) {
+    console.warn(
+      "⚠️ Kakao REST API 키가 설정되지 않았습니다.\n" +
+        ".env 파일에 EXPO_PUBLIC_KAKAO_REST_API_KEY를 설정하세요.",
+    );
+    return "";
+  }
+
+  return restApiKey;
+};
+
 export const KAKAO_MAP_CONFIG = {
   // Kakao Developers (https://developers.kakao.com/)에서 발급받은 JavaScript 키
   APP_KEY: getKakaoApiKey(),
+
+  // REST API 키 (리버스 지오코딩용)
+  REST_API_KEY: getKakaoRestApiKey(),
 
   // 기본 지도 설정
   DEFAULT_CENTER: {
