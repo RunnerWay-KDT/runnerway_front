@@ -45,6 +45,8 @@ module.exports = {
       reactCompiler: true,
     },
     extra: {
+      // API Base URL 설정
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
       // 환경 변수를 통해 Kakao Map API 키 전달
       kakaoMapAppKey: process.env.EXPO_PUBLIC_KAKAO_MAP_APP_KEY,
       // REST API 키 (리버스 지오코딩용)

@@ -4,6 +4,43 @@
 
 import Constants from "expo-constants";
 
+// ============================================
+// API Configuration
+// ============================================
+
+const getApiBaseUrl = (): string => {
+  const apiUrl =
+    Constants.expoConfig?.extra?.apiBaseUrl ||
+    process.env.EXPO_PUBLIC_API_BASE_URL;
+
+  if (!apiUrl) {
+    console.warn(
+      "⚠️ API Base URL이 설정되지 않았습니다.\n" +
+        ".env 파일에 EXPO_PUBLIC_API_BASE_URL을 설정하세요.\n" +
+        "기본값: http://localhost:8000을 사용합니다.",
+    );
+    return "http://localhost:8000";
+  }
+
+  return apiUrl;
+};
+
+export const API_CONFIG = {
+  BASE_URL: getApiBaseUrl(),
+  ENDPOINTS: {
+    AUTH: {
+      LOGIN: "/api/v1/auth/login",
+      SIGNUP: "/api/v1/auth/signup",
+      LOGOUT: "/api/v1/auth/logout",
+      REFRESH: "/api/v1/auth/refresh",
+    },
+    USER: {
+      ME: "/api/v1/users/me",
+      UPDATE_PROFILE: "/api/v1/users/me",
+    },
+  },
+};
+
 // Expo의 환경 변수에서 API 키 가져오기
 const getKakaoApiKey = (): string => {
   // Expo SDK 49+에서는 EXPO_PUBLIC_ 접두사를 사용합니다
