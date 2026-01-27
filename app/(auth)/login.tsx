@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Mail, Lock, AlertCircle, MessageCircle } from "lucide-react-native";
+import { Mail, Lock, AlertCircle } from "lucide-react-native";
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { useAuth } from "../../contexts/AuthContext";
 import { PrimaryButton } from "../../components/PrimaryButton";
@@ -25,7 +25,7 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithSocial } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -56,22 +56,12 @@ export default function LoginScreen() {
       if (result.success) {
         router.replace("/(tabs)");
       } else {
-        setError("로그인에 실패했습니다");
+        setError("이메일 또는 비밀번호가 올바르지 않습니다");
       }
-    } catch {
-      setError("로그인에 실패했습니다");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSocialLogin = async (provider: string) => {
-    setIsLoading(true);
-    try {
-      await loginWithSocial(provider);
-      router.replace("/(tabs)");
-    } catch {
-      setError("소셜 로그인에 실패했습니다");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "로그인에 실패했습니다";
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -154,24 +144,6 @@ export default function LoginScreen() {
               <Text style={styles.forgotPasswordText}>비밀번호 찾기</Text>
             </TouchableOpacity>
           </Animated.View>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.socialButtons}>
-            <TouchableOpacity
-              style={styles.kakaoButton}
-              onPress={() => handleSocialLogin("kakao")}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              <MessageCircle size={20} color="#3C1E1E" />
-              <Text style={styles.kakaoButtonText}>카카오 계정으로 로그인</Text>
-            </TouchableOpacity>
-          </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>계정이 없으신가요? </Text>
@@ -258,38 +230,6 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: Colors.zinc[500],
     fontSize: FontSize.sm,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: Spacing.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.zinc[800],
-  },
-  dividerText: {
-    color: Colors.zinc[500],
-    paddingHorizontal: Spacing.md,
-    fontSize: FontSize.sm,
-  },
-  socialButtons: {
-    marginBottom: Spacing.lg,
-  },
-  kakaoButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FEE500",
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md,
-    gap: Spacing.md,
-  },
-  kakaoButtonText: {
-    color: "#3C1E1E",
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semibold,
   },
   footer: {
     flexDirection: "row",

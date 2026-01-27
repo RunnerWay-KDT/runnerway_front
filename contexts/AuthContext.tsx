@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { authApi, userApi, tokenManager } from "../utils/api";
 
 interface UserStats {
   totalDistance: number;
@@ -26,7 +27,6 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean }>;
-  loginWithSocial: (provider: string) => Promise<{ success: boolean }>;
   signup: (
     email: string,
     password: string,
@@ -48,23 +48,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadUserFromStorage();
-  }, []);
-
-  const loadUserFromStorage = async () => {
-    try {
-      const savedUser = await AsyncStorage.getItem(STORAGE_KEY);
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-    } catch (error) {
-      console.error("Failed to load user from storage:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const saveUserToStorage = async (userData: User) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
@@ -73,48 +56,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loadUserFromStorage = async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem(STORAGE_KEY);
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      } else {
+        // 저장된 사용자 정보가 없지만 토큰이 있다면 사용자 정보 가져오기
+        const token = await tokenManager.getAccessToken();
+        if (token) {
+          try {
+            const response = await userApi.getMe();
+            if (response.success && response.data) {
+              const userData: User = {
+                id: response.data.id,
+                email: response.data.email,
+                name: response.data.name,
+                avatar: response.data.avatar_url,
+                provider: response.data.provider || undefined,
+                stats: {
+                  totalDistance: response.data.stats.total_distance,
+                  totalWorkouts: response.data.stats.total_workouts,
+                  completedRoutes: response.data.stats.completed_routes,
+                },
+              };
+              setUser(userData);
+              await saveUserToStorage(userData);
+            }
+          } catch (error) {
+            console.error("Failed to fetch user info:", error);
+            // 토큰이 유효하지 않으면 삭제
+            await tokenManager.clearTokens();
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load user from storage:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUserFromStorage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const login = async (
     email: string,
     password: string,
   ): Promise<{ success: boolean }> => {
-    // 실제 앱에서는 API 호출
-    const userData: User = {
-      id: "1",
-      email: email,
-      name: email.split("@")[0],
-      avatar: null,
-      stats: {
-        totalDistance: 142.5,
-        totalWorkouts: 24,
-        completedRoutes: 18,
-      },
-    };
+    try {
+      const response = await authApi.login({ email, password });
 
-    setUser(userData);
-    await saveUserToStorage(userData);
-    return { success: true };
-  };
+      if (response.success && response.data) {
+        // 사용자 정보를 로컬 형식으로 변환
+        const userData: User = {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          name: response.data.user.name,
+          avatar: response.data.user.avatar_url,
+          provider: response.data.user.provider || undefined,
+          stats: {
+            totalDistance: response.data.user.stats.total_distance,
+            totalWorkouts: response.data.user.stats.total_workouts,
+            completedRoutes: response.data.user.stats.completed_routes,
+          },
+        };
 
-  const loginWithSocial = async (
-    provider: string,
-  ): Promise<{ success: boolean }> => {
-    // 실제 앱에서는 OAuth 처리
-    const userData: User = {
-      id: "1",
-      email: `user@${provider}.com`,
-      name: `${provider} User`,
-      avatar: null,
-      provider: provider,
-      stats: {
-        totalDistance: 142.5,
-        totalWorkouts: 24,
-        completedRoutes: 18,
-      },
-    };
+        setUser(userData);
+        await saveUserToStorage(userData);
+        return { success: true };
+      }
 
-    setUser(userData);
-    await saveUserToStorage(userData);
-    return { success: true };
+      return { success: false };
+    } catch (error) {
+      console.error("Login error:", error);
+      return { success: false };
+    }
   };
 
   const signup = async (
@@ -122,30 +141,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     name: string,
   ): Promise<{ success: boolean }> => {
-    // 실제 앱에서는 API 호출
-    const userData: User = {
-      id: "1",
-      email: email,
-      name: name,
-      avatar: null,
-      stats: {
-        totalDistance: 0,
-        totalWorkouts: 0,
-        completedRoutes: 0,
-      },
-    };
+    try {
+      const response = await authApi.signup({ email, password, name });
 
-    setUser(userData);
-    await saveUserToStorage(userData);
-    return { success: true };
+      if (response.success && response.data) {
+        // 사용자 정보를 로컬 형식으로 변환
+        const userData: User = {
+          id: response.data.user.id,
+          email: response.data.user.email,
+          name: response.data.user.name,
+          avatar: response.data.user.avatar_url,
+          provider: response.data.user.provider || undefined,
+          stats: {
+            totalDistance: response.data.user.stats.total_distance,
+            totalWorkouts: response.data.user.stats.total_workouts,
+            completedRoutes: response.data.user.stats.completed_routes,
+          },
+        };
+
+        setUser(userData);
+        await saveUserToStorage(userData);
+        return { success: true };
+      }
+
+      return { success: false };
+    } catch (error) {
+      console.error("Signup error:", error);
+      return { success: false };
+    }
   };
 
   const logout = async () => {
-    setUser(null);
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
+      await authApi.logout();
     } catch (error) {
-      console.error("Failed to remove user from storage:", error);
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+      } catch (error) {
+        console.error("Failed to remove user from storage:", error);
+      }
     }
   };
 
@@ -156,24 +193,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     try {
-      // 실제 앱에서는 API 호출
-      // const response = await fetch('/api/v1/users/me', {
-      //   method: 'PATCH',
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`,
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(data),
-      // });
+      const response = await userApi.updateProfile({
+        name: data.name,
+        avatar_url: data.avatar,
+      });
 
-      const updatedUser: User = {
-        ...user,
-        name: data.name !== undefined ? data.name : user.name,
-        avatar: data.avatar !== undefined ? data.avatar : user.avatar,
-      };
+      if (response.success && response.data) {
+        const updatedUser: User = {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          avatar: response.data.avatar_url,
+          provider: response.data.provider || undefined,
+          stats: {
+            totalDistance: response.data.stats.total_distance,
+            totalWorkouts: response.data.stats.total_workouts,
+            completedRoutes: response.data.stats.completed_routes,
+          },
+        };
 
-      setUser(updatedUser);
-      await saveUserToStorage(updatedUser);
+        setUser(updatedUser);
+        await saveUserToStorage(updatedUser);
+      }
     } catch (error) {
       console.error("Failed to update profile:", error);
       throw error;
@@ -184,7 +225,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     login,
-    loginWithSocial,
     signup,
     logout,
     updateProfile,

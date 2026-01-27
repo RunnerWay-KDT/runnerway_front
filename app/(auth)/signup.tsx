@@ -109,9 +109,13 @@ export default function SignupScreen() {
       );
       if (result.success) {
         router.replace("/(tabs)");
+      } else {
+        setErrors({ email: "회원가입에 실패했습니다" });
       }
-    } catch {
-      setErrors({ email: "회원가입에 실패했습니다" });
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "회원가입에 실패했습니다";
+      setErrors({ email: errorMessage });
     } finally {
       setIsLoading(false);
     }
