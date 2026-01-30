@@ -38,6 +38,9 @@ export const API_CONFIG = {
       ME: "/api/v1/users/me",
       UPDATE_PROFILE: "/api/v1/users/me",
     },
+    ROUTES: {
+      CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
+    },
   },
 };
 

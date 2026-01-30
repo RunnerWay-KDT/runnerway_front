@@ -105,8 +105,15 @@ export class ApiClient {
       !endpoint.includes("/auth/signup")
     ) {
       const token = await tokenManager.getAccessToken();
+      console.log(
+        "🔑 Access Token:",
+        token ? `${token.substring(0, 20)}...` : "없음",
+      );
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
+        console.log("✅ Authorization 헤더 추가됨");
+      } else {
+        console.warn("⚠️ 토큰이 없습니다. 로그인이 필요합니다.");
       }
     }
 
@@ -123,6 +130,20 @@ export class ApiClient {
         const errorData = await response.json().catch(() => ({
           message: "서버 오류가 발생했습니다",
         }));
+
+        console.error("❌ API 에러 상세:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        });
+
+        // 401 에러인 경우 특별 처리
+        if (response.status === 401) {
+          console.error("🚫 인증 실패 - 토큰이 유효하지 않거나 만료되었습니다");
+          // 토큰 삭제 (선택적)
+          // await tokenManager.clearTokens();
+        }
+
         throw new Error(
           errorData.message || errorData.detail || `HTTP ${response.status}`,
         );
@@ -307,6 +328,36 @@ export const userApi = {
       API_CONFIG.ENDPOINTS.USER.UPDATE_PROFILE,
       data,
     );
+  },
+};
+
+// ============================================
+// 경로 API
+// ============================================
+
+export const routeApi = {
+  /**
+   * 커스텀 그림 경로 저장
+   */
+  async saveCustomDrawing(data: {
+    name: string;
+    svg_path: string;
+    location: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+    estimated_distance?: number;
+  }): Promise<
+    ApiResponse<{
+      route_id: string;
+      name: string;
+      svg_path: string;
+      estimated_distance?: number;
+      created_at: string;
+    }>
+  > {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.CUSTOM_DRAWING, data);
   },
 };
 
