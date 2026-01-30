@@ -50,11 +50,11 @@ export default function GeneratingScreen() {
 
         // 2. 백엔드에 보낼 키워드 구성 (Backend logic handles distance ranges now)
         const conditionMap: Record<string, string> = {
-          "recovery": "목적: 회복 러닝",
-          "fat-burn": "목적: 지방 연소",
-          "challenge": "목적: 기록 도전"
+          "flat": "목적: 평지 위주 러닝",
+          "balanced": "목적: 복합 지형(밸런스) 러닝",
+          "uphill": "목적: 언덕/업힐 도전 러닝"
         };
-        const basePrompt = conditionMap[searchParams.condition || "recovery"];
+        const basePrompt = conditionMap[searchParams.condition || "flat"];
         const safetyPrompt = searchParams.safetyMode === "true" ? " (안전 우선)" : "";
         
         const handleRecommendation = async () => {

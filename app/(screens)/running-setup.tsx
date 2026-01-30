@@ -25,26 +25,26 @@ interface Condition {
 
 export default function RunningSetupScreen() {
   const router = useRouter();
-  const [condition, setCondition] = useState("recovery");
+  const [condition, setCondition] = useState("flat");
   const [safetyMode, setSafetyMode] = useState(true);
 
   const conditions: Condition[] = [
     {
-      id: "recovery",
-      title: "회복 러닝",
-      description: "가볍게 몸을 풀어주는 편안한 페이스",
+      id: "flat",
+      title: "평지 러닝",
+      description: "경사가 거의 없는 편안한 5km 평지 코스",
       Icon: Battery,
     },
     {
-      id: "fat-burn",
-      title: "지방 연소",
-      description: "적절한 심박수로 지방 연소 극대화",
+      id: "balanced",
+      title: "밸런스 러닝",
+      description: "적절한 오르내림이 있는 5km 복합 코스",
       Icon: Flame,
     },
     {
-      id: "challenge",
-      title: "기록 도전",
-      description: "목표를 향한 강도 높은 러닝",
+      id: "uphill",
+      title: "언덕 도전",
+      description: "경사도가 높은 5km 업힐 도전 코스",
       Icon: Trophy,
     },
   ];
@@ -61,7 +61,7 @@ export default function RunningSetupScreen() {
       pathname: "/(screens)/generating",
       params: {
         mode: "running",
-        condition, // 선택한 컨디션 (recovery, fat-burn, challenge)
+        condition, // 선택한 컨디션 (flat, balanced, uphill)
         safetyMode: safetyMode.toString(),
         startLat: params.startLat,
         startLng: params.startLng,
