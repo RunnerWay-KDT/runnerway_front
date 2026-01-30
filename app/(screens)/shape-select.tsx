@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,6 +32,7 @@ import {
   Spacing,
   BorderRadius,
 } from "../../constants/theme";
+import { routeApi } from "../../utils/api";
 
 interface Shape {
   id: string;
@@ -47,6 +49,8 @@ export default function ShapeSelectScreen() {
   const [activeMainTab, setActiveMainTab] = useState("presets");
   const [activeSubTab, setActiveSubTab] = useState("shapes");
   const [hasCustomDrawing, setHasCustomDrawing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedPathData, setSavedPathData] = useState<string>("");
 
   const shapes: Shape[] = [
     {
@@ -108,7 +112,7 @@ export default function ShapeSelectScreen() {
     setSelectedShape(shapeId);
   };
 
-  const handleDrawingComplete = (
+  const handleDrawingComplete = async (
     pathData: string,
     points: { x: number; y: number }[],
   ) => {
@@ -122,17 +126,52 @@ export default function ShapeSelectScreen() {
     const kmPerPixel = 2 / 350; // Rough estimation
     const distanceKm = Math.max(0.5, totalPixelDistance * kmPerPixel);
 
-    // Navigate to generating screen with custom drawing
-    router.push({
-      pathname: "/(screens)/generating",
-      params: {
-        mode: "custom",
-        shapeName: "커스텀 경로",
-        shapeIconName: "sparkles",
-        shapeDistance: `${distanceKm.toFixed(1)}km`,
-        customPath: pathData,
-      },
-    });
+    // Save path data for later use
+    setSavedPathData(pathData);
+    setIsSaving(true);
+
+    try {
+      // Save to backend
+      const response = await routeApi.saveCustomDrawing({
+        name: `커스텀 경로 ${new Date().toLocaleString("ko-KR")}`,
+        svg_path: pathData,
+        location: {
+          latitude: 37.5665, // TODO: 실제 사용자 위치로 변경
+          longitude: 126.978,
+          address: "서울특별시",
+        },
+        estimated_distance: distanceKm,
+      });
+
+      if (response.success && response.data) {
+        console.log("✅ 커스텀 경로 저장 성공:", response.data);
+        Alert.alert(
+          "저장 완료",
+          `경로가 성공적으로 저장되었습니다!\nID: ${response.data.route_id}`,
+        );
+
+        // Navigate to generating screen with custom drawing
+        router.push({
+          pathname: "/(screens)/generating",
+          params: {
+            mode: "custom",
+            shapeName: "커스텀 경로",
+            shapeIconName: "sparkles",
+            shapeDistance: `${distanceKm.toFixed(1)}km`,
+            customPath: pathData,
+            routeId: response.data.route_id,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("❌ 커스텀 경로 저장 실패:", error);
+      Alert.alert(
+        "저장 실패",
+        "경로 저장 중 오류가 발생했습니다. 다시 시도해주세요.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDrawingChange = (hasDrawing: boolean) => {

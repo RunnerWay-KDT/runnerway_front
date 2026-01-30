@@ -38,10 +38,9 @@ export const API_CONFIG = {
       ME: "/api/v1/users/me",
       UPDATE_PROFILE: "/api/v1/users/me",
     },
-    // 러닝 경로 관련 엔드포인트
     ROUTES: {
-        RECOMMEND: "/api/v1/routes/recommend" // 경로 추천 (POST) - server.py 통합 완료
-    }
+      CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
+    },
   },
 };
 

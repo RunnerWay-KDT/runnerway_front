@@ -40,6 +40,7 @@ export function DrawingCanvas({
   const [allPoints, setAllPoints] = useState<Point[]>([]);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [endPoint, setEndPoint] = useState<Point | null>(null);
+  const [isDrawingComplete, setIsDrawingComplete] = useState(false); // 그리기 완료 상태
 
   const pathData = useSharedValue("");
 
@@ -72,12 +73,18 @@ export function DrawingCanvas({
   const savePath = useCallback((pathStr: string) => {
     if (pathStr) {
       setPaths((prev) => [...prev, pathStr]);
+      setIsDrawingComplete(true); // 그리기 완료 표시
     }
     setCurrentPath("");
   }, []);
 
   const gesture = Gesture.Pan()
     .onStart((event) => {
+      // 이미 그림이 완료되었으면 더 이상 그릴 수 없음
+      if (isDrawingComplete) {
+        return;
+      }
+
       const x = event.x;
       const y = event.y;
       pathData.value = `M ${x} ${y}`;
@@ -86,6 +93,10 @@ export function DrawingCanvas({
       runOnJS(notifyDrawingChange)(true);
     })
     .onUpdate((event) => {
+      if (isDrawingComplete) {
+        return;
+      }
+
       const x = event.x;
       const y = event.y;
       const newPath = `${pathData.value} L ${x} ${y}`;
@@ -94,6 +105,10 @@ export function DrawingCanvas({
       runOnJS(addPoint)(x, y);
     })
     .onEnd((event) => {
+      if (isDrawingComplete) {
+        return;
+      }
+
       const x = event.x;
       const y = event.y;
       const finalPath = pathData.value;
@@ -108,26 +123,26 @@ export function DrawingCanvas({
     setAllPoints([]);
     setStartPoint(null);
     setEndPoint(null);
+    setIsDrawingComplete(false); // 그리기 완료 상태 초기화
     pathData.value = "";
     notifyDrawingChange(false);
   };
 
   const handleUndo = () => {
-    if (paths.length > 0) {
-      const newPaths = paths.slice(0, -1);
-      setPaths(newPaths);
-      if (newPaths.length === 0) {
-        setAllPoints([]);
-        setStartPoint(null);
-        setEndPoint(null);
-        notifyDrawingChange(false);
-      }
-    }
+    // 한 번에 그리기만 가능하므로 Undo는 전체 삭제와 동일
+    handleClear();
   };
 
   const handleComplete = () => {
     if (paths.length > 0 && onDrawingComplete) {
+      // M, L 명령어만 사용 (폐곡선 제거)
       const fullPath = paths.join(" ");
+
+      console.log("✅ 경로 저장:", {
+        path: fullPath,
+        pointCount: allPoints.length,
+      });
+
       onDrawingComplete(fullPath, allPoints);
     }
   };
@@ -139,6 +154,8 @@ export function DrawingCanvas({
     if (allPoints.length < 2) return "0.0";
 
     let totalPixelDistance = 0;
+
+    // 포인트 간 거리 계산 (폐곡선 제외)
     for (let i = 1; i < allPoints.length; i++) {
       const dx = allPoints[i].x - allPoints[i - 1].x;
       const dy = allPoints[i].y - allPoints[i - 1].y;
@@ -253,7 +270,17 @@ export function DrawingCanvas({
                 손가락으로 원하는 경로를 그려주세요
               </Text>
               <Text style={styles.instructionSubtext}>
-                시작점과 끝점이 가까우면 더 좋은 경로가 생성됩니다
+                ⚠️ 한 번에 그려야 합니다
+              </Text>
+            </View>
+          )}
+
+          {/* Drawing complete overlay */}
+          {isDrawingComplete && (
+            <View style={styles.completeOverlay}>
+              <Text style={styles.completeText}>✓ 그리기 완료</Text>
+              <Text style={styles.completeSubtext}>
+                완료 버튼을 눌러 저장하세요
               </Text>
             </View>
           )}
@@ -410,6 +437,31 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.zinc[500],
     textAlign: "center",
+    lineHeight: 20,
+  },
+  completeOverlay: {
+    position: "absolute",
+    top: Spacing.md,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    backgroundColor: `${Colors.blue[500]}20`,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.blue[500],
+  },
+  completeText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.blue[400],
+  },
+  completeSubtext: {
+    fontSize: FontSize.xs,
+    color: Colors.blue[300],
+    marginTop: 2,
   },
   infoBar: {
     flexDirection: "row",
