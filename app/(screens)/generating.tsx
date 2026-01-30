@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Dimensions, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
+import { routeApi } from "../../utils/api";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -28,36 +29,75 @@ export default function GeneratingScreen() {
     { Icon: Sparkles, text: "그림 형태 보정 중", color: Colors.purple[400] },
   ];
 
+  // 파라미터 수신
+  const searchParams = useLocalSearchParams<{ 
+    condition: string; 
+    safetyMode: string;
+    startLat: string; 
+    startLng: string; 
+  }>();
+
   useEffect(() => {
+    // 로딩 애니메이션 실행
     rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
-  }, [rotation]);
 
-  useEffect(() => {
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          setTimeout(() => {
-            router.replace({
-              pathname: "/(screens)/route-preview",
-              params: params,
-            });
-          }, 500);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 60);
+    // [핵심 로직] 경로 생성 실행
+    const generateRoute = async () => {
+        // 1. 진행률 시뮬레이션 (API 응답 대기 시간 동안 보여줄 UI)
+        const timer = setInterval(() => {
+          setProgress((prev) => (prev < 90 ? prev + 1 : prev));
+        }, 100);
 
-    const stepInterval = setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % steps.length);
-    }, 2000);
+        // 2. 백엔드에 보낼 키워드 구성 (Backend logic handles distance ranges now)
+        const conditionMap: Record<string, string> = {
+          "recovery": "목적: 회복 러닝",
+          "fat-burn": "목적: 지방 연소",
+          "challenge": "목적: 기록 도전"
+        };
+        const basePrompt = conditionMap[searchParams.condition || "recovery"];
+        const safetyPrompt = searchParams.safetyMode === "true" ? " (안전 우선)" : "";
+        
+        const handleRecommendation = async () => {
+            console.log("📍 Generating Route for:", searchParams.startLat, searchParams.startLng);
+            
+            try {
+                const lat = parseFloat(searchParams.startLat || "37.5005");
+                const lng = parseFloat(searchParams.startLng || "127.0365");
 
-    return () => {
-      clearInterval(progressInterval);
-      clearInterval(stepInterval);
+                const response = await routeApi.recommendRoute({
+                    lat: lat,
+                    lng: lng,
+                    prompt: `${basePrompt}${safetyPrompt}`
+                });
+
+                if (!response || !response.candidates) {
+                    throw new Error("경로 데이터를 받아오지 못했습니다.");
+                }
+
+                // 90% -> 100%
+                setProgress(100);
+                
+                router.replace({
+                    pathname: "/(screens)/route-preview",
+                    params: {
+                        candidates: JSON.stringify(response.candidates), // 후보 경로 리스트 전달
+                        mode: "recommend"
+                    }
+                });
+            } catch (error) {
+                console.error("Route generation error:", error);
+                Alert.alert("오류", "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+                router.back();
+            }
+        };
+
+        // 3. API 호출 및 완료 처리
+        await handleRecommendation();
+        clearInterval(timer);
     };
-  }, [params, router, steps.length]);
+
+    generateRoute();
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],

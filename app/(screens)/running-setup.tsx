@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Battery, Flame, Trophy, Moon, Shield } from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
@@ -49,13 +49,22 @@ export default function RunningSetupScreen() {
     },
   ];
 
+  // 이전 화면(Location Setup)에서 전달받은 좌표 파라미터
+  const params = useLocalSearchParams<{ startLat: string; startLng: string }>();
+
   const handleGenerate = () => {
+    // 좌표가 없으면 진행하지 않음 (간단한 방어 코드)
+    if (!params.startLat || !params.startLng) return;
+
+    // 생성 화면으로 이동하며 데이터 전달
     router.push({
       pathname: "/(screens)/generating",
       params: {
         mode: "running",
-        condition,
+        condition, // 선택한 컨디션 (recovery, fat-burn, challenge)
         safetyMode: safetyMode.toString(),
+        startLat: params.startLat,
+        startLng: params.startLng,
       },
     });
   };

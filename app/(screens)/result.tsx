@@ -31,6 +31,9 @@ import { getIconComponent } from "../../utils/shapeIcons";
 export default function ResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  
+  // 전달받은 좌표 데이터 파싱 (최적화: 예외처리 생략)
+  const routePathData = params.path ? JSON.parse(params.path as string) : [];
 
   const isCustomDrawing = params.mode === "custom";
   const iconName = (params.shapeIconName as string) || "heart";
@@ -103,7 +106,7 @@ export default function ResultScreen() {
         entering={FadeInUp.delay(450).duration(400)}
         style={styles.mapContainer}
       >
-        <KakaoMap routePath={iconName} />
+        <KakaoMap routePath={iconName} polyline={routePathData} />
       </Animated.View>
 
       {/* Route Card */}

@@ -75,3 +75,31 @@ export interface UserProfileResponse {
   data: UserData;
   message: string;
 }
+
+// ============================================
+// 러닝 경로 관련 타입
+// ============================================
+
+export interface RouteRequest {
+  lat: number;
+  lng: number;
+  target_distance_km?: number;
+  prompt?: string;
+}
+
+export interface RoutePoint {
+  lat: number;
+  lng: number;
+}
+
+export interface RouteCandidate {
+  id: number;
+  name: string;
+  distance: string;
+  time: number;
+  path: RoutePoint[];
+}
+
+export interface RecommendRouteResponse {
+  candidates: RouteCandidate[];
+}

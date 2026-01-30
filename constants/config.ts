@@ -8,17 +8,17 @@ import Constants from "expo-constants";
 // API Configuration
 // ============================================
 
+import { Platform } from "react-native";
+
 const getApiBaseUrl = (): string => {
   const apiUrl =
     Constants.expoConfig?.extra?.apiBaseUrl ||
     process.env.EXPO_PUBLIC_API_BASE_URL;
 
   if (!apiUrl) {
-    console.warn(
-      "⚠️ API Base URL이 설정되지 않았습니다.\n" +
-        ".env 파일에 EXPO_PUBLIC_API_BASE_URL을 설정하세요.\n" +
-        "기본값: http://localhost:8000을 사용합니다.",
-    );
+    if (Platform.OS === "android") {
+        return "http://10.0.2.2:8000";
+    }
     return "http://localhost:8000";
   }
 
@@ -38,6 +38,10 @@ export const API_CONFIG = {
       ME: "/api/v1/users/me",
       UPDATE_PROFILE: "/api/v1/users/me",
     },
+    // 러닝 경로 관련 엔드포인트
+    ROUTES: {
+        RECOMMEND: "/api/v1/routes/recommend" // 경로 추천 (POST) - server.py 통합 완료
+    }
   },
 };
 

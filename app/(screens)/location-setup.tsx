@@ -19,10 +19,14 @@ export default function LocationSetupScreen() {
   const params = useLocalSearchParams<{ workoutType?: string }>();
   const workoutType = params.workoutType || "running";
 
+  // Yeoksam Station coordinates
   const [selectedLocation, setSelectedLocation] = useState<{
     lat: number;
     lng: number;
-  } | null>(null);
+  } | null>({
+    lat: 37.5005,
+    lng: 127.0365,
+  });
 
   const handleLocationSelected = (location: { lat: number; lng: number }) => {
     console.log("Location selected:", location);

@@ -11,6 +11,8 @@ import type {
   UserProfileResponse,
   UpdateProfileRequest,
   ApiResponse,
+  RouteRequest,
+  RecommendRouteResponse
 } from "../types/api";
 
 // ============================================
@@ -308,6 +310,24 @@ export const userApi = {
       data,
     );
   },
+};
+
+// ============================================
+// [러닝 경로 API 서비스]
+// server.py의 API를 호출하는 함수들입니다.
+// ============================================
+
+export const routeApi = {
+    /**
+     * 경로 추천 요청 (GPT + OSMNX)
+     * 예외 처리는 최소화하고 핵심 로직만 구현했습니다.
+     */
+    async recommendRoute(data: RouteRequest): Promise<RecommendRouteResponse> {
+        return apiClient.post<RecommendRouteResponse>(
+            API_CONFIG.ENDPOINTS.ROUTES.RECOMMEND,
+            data
+        );
+    }
 };
 
 // 기본 내보내기

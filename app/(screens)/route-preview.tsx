@@ -53,7 +53,29 @@ export default function RoutePreviewScreen() {
   const shapeName = (params.shapeName as string) || "하트";
   const savedRouteName = params.routeName as string;
 
+  // AI 추천 후보 경로 파싱
+  const candidates = params.candidates ? JSON.parse(params.candidates as string) : [];
+
   const generateRouteOptions = (): RouteOption[] => {
+    // 1. AI 추천 경로인 경우 (API 응답 데이터 사용)
+    if (candidates.length > 0) {
+      return candidates.map((candidate: any, index: number) => ({
+        id: candidate.id,
+        name: candidate.name, // "Route A", "Route B"...
+        distance: candidate.distance,
+        estimatedTime: candidate.time,
+        safety: 90 - (index * 2), // Mock score difference
+        elevation: 10 + (index * 5),
+        lighting: 85,
+        sidewalk: 95,
+        convenience: 3,
+        difficulty: index === 0 ? "쉬움" : index === 1 ? "보통" : "도전",
+        tag: index === 0 ? "추천" : null,
+        path: candidate.path // Store path data in option
+      }));
+    }
+
+    // 2. 쉐이프 기반 경로 생성 (기존 로직)
     const baseDistance = parseFloat(
       (params.shapeDistance as string) || (params.distance as string) || "4.2",
     );
@@ -71,7 +93,7 @@ export default function RoutePreviewScreen() {
         sidewalk: 96,
         convenience: 5,
         difficulty: "쉬움",
-        tag: fromSaved ? null : "추천",
+        tag: fromSaved ? null : "추천"
       },
       {
         id: 2,
@@ -87,7 +109,7 @@ export default function RoutePreviewScreen() {
         sidewalk: 92,
         convenience: 3,
         difficulty: "보통",
-        tag: fromSaved ? null : "BEST",
+        tag: fromSaved ? null : "BEST"
       },
       {
         id: 3,
@@ -109,7 +131,7 @@ export default function RoutePreviewScreen() {
   };
 
   const routeOptions = generateRouteOptions();
-  const [selectedRoute, setSelectedRoute] = useState(routeOptions[1]);
+  const [selectedRoute, setSelectedRoute] = useState(routeOptions[0]); 
 
   const RouteIcon = getIconComponent(iconName);
 
@@ -138,10 +160,17 @@ export default function RoutePreviewScreen() {
     }
   };
 
+  // 선택된 경로의 path 데이터 (AI 추천인 경우 option에 포함됨)
+  const currentPathData = (selectedRoute as any).path || [];
+
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <KakaoMap routePath={iconName} />
+      <KakaoMap 
+        routePath={iconName} 
+        polyline={currentPathData} 
+        center={currentPathData.length > 0 ? { lat: currentPathData[0].lat, lng: currentPathData[0].lng } : undefined}
+      />
 
       {/* Header */}
       <View style={styles.header}>
