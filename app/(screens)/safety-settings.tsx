@@ -1,21 +1,13 @@
 import { useRouter } from "expo-router";
-import {
-  AlertTriangle,
-  MapPin,
-  Moon,
-  Phone,
-  Shield,
-  User,
-} from "lucide-react-native";
-import React, { useState } from "react";
+import { Moon, Shield } from "lucide-react-native";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,98 +20,112 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-
-interface EmergencyContact {
-  id: string;
-  name: string;
-  phone: string;
-}
+import { settingsApi } from "../../utils/api";
 
 export default function SafetySettingsScreen() {
   const router = useRouter();
+
+  // 로딩 상태
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // 안전 설정 상태
   const [settings, setSettings] = useState({
     nightSafetyMode: true,
     autoNightMode: true,
-    shareLocation: false,
-    sosButton: true,
   });
 
-  const [emergencyContacts, setEmergencyContacts] = useState<
-    EmergencyContact[]
-  >([{ id: "1", name: "엄마", phone: "010-1234-5678" }]);
+  // 초기 설정값
+  const [initialSettings, setInitialSettings] = useState(settings);
 
-  const [newContactName, setNewContactName] = useState("");
-  const [newContactPhone, setNewContactPhone] = useState("");
-  const [isAddingContact, setIsAddingContact] = useState(false);
+  // 설정 로드
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await settingsApi.getSettings();
+
+      if (response.success && response.data) {
+        const loadedSettings = {
+          nightSafetyMode: response.data.night_safety_mode,
+          autoNightMode: response.data.auto_night_mode,
+        };
+        setSettings(loadedSettings);
+        setInitialSettings(loadedSettings);
+      }
+    } catch (error) {
+      console.error("설정 로드 실패:", error);
+      Alert.alert("오류", "설정을 불러오는데 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggle = (key: keyof typeof settings) => {
     setSettings((prev) => ({
       ...prev,
       [key]: !prev[key],
     }));
-
-    // TODO: API 호출
-    // PATCH /api/v1/users/me/safety-settings
   };
 
-  const handleAddContact = () => {
-    if (!newContactName.trim() || !newContactPhone.trim()) {
-      Alert.alert("알림", "이름과 전화번호를 모두 입력해주세요.");
+  // 뒤로가기 시 변경사항 저장
+  const handleBack = async () => {
+    const hasChanges =
+      settings.nightSafetyMode !== initialSettings.nightSafetyMode ||
+      settings.autoNightMode !== initialSettings.autoNightMode;
+
+    if (!hasChanges) {
+      router.back();
       return;
     }
 
-    // 전화번호 형식 간단 검증
-    const phoneRegex = /^[0-9-]{10,15}$/;
-    if (!phoneRegex.test(newContactPhone.replace(/-/g, ""))) {
-      Alert.alert("알림", "올바른 전화번호 형식을 입력해주세요.");
-      return;
+    try {
+      setSaving(true);
+
+      const response = await settingsApi.updateSettings({
+        night_safety_mode: settings.nightSafetyMode,
+        auto_night_mode: settings.autoNightMode,
+      });
+
+      if (!response.success) {
+        Alert.alert("오류", "설정 저장에 실패했습니다.");
+        return;
+      }
+
+      router.back();
+    } catch (error) {
+      console.error("설정 저장 실패:", error);
+      Alert.alert("오류", "설정 저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
     }
-
-    if (emergencyContacts.length >= 3) {
-      Alert.alert("알림", "긴급 연락처는 최대 3명까지 등록할 수 있습니다.");
-      return;
-    }
-
-    const newContact: EmergencyContact = {
-      id: Date.now().toString(),
-      name: newContactName.trim(),
-      phone: newContactPhone.trim(),
-    };
-
-    setEmergencyContacts((prev) => [...prev, newContact]);
-    setNewContactName("");
-    setNewContactPhone("");
-    setIsAddingContact(false);
-
-    // TODO: API 호출
-    // POST /api/v1/users/me/emergency-contacts
   };
 
-  const handleDeleteContact = (contactId: string) => {
-    Alert.alert("연락처 삭제", "이 긴급 연락처를 삭제하시겠습니까?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () => {
-          setEmergencyContacts((prev) =>
-            prev.filter((c) => c.id !== contactId),
-          );
-          // TODO: API 호출
-          // DELETE /api/v1/users/me/emergency-contacts/{contactId}
-        },
-      },
-    ]);
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScreenHeader
+          title="안전 설정"
+          subtitle="야간 안전 모드를 설정하세요"
+          onBack={handleBack}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.purple[500]} />
+          <Text style={styles.loadingText}>설정을 불러오는 중...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScreenHeader
         title="안전 설정"
-        subtitle="야간 모드와 긴급 연락처를 설정하세요"
-        onBack={() => router.back()}
+        subtitle="야간 안전 모드를 설정하세요"
+        onBack={handleBack}
       />
 
       <ScrollView
@@ -127,6 +133,13 @@ export default function SafetySettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {saving && (
+          <View style={styles.savingIndicator}>
+            <ActivityIndicator size="small" color={Colors.purple[500]} />
+            <Text style={styles.savingText}>저장 중...</Text>
+          </View>
+        )}
+
         {/* 야간 안전 모드 섹션 */}
         <Animated.View
           entering={FadeInUp.delay(0).duration(400)}
@@ -182,185 +195,12 @@ export default function SafetySettingsScreen() {
           </View>
         </Animated.View>
 
-        {/* 위치 공유 섹션 */}
-        <Animated.View
-          entering={FadeInUp.delay(100).duration(400)}
-          style={styles.section}
-        >
-          <Text style={styles.sectionTitle}>위치 공유</Text>
-          <View style={styles.sectionContent}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: `${Colors.emerald[500]}20` },
-                  ]}
-                >
-                  <MapPin
-                    size={20}
-                    color={Colors.emerald[400]}
-                    strokeWidth={2}
-                  />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>실시간 위치 공유</Text>
-                  <Text style={styles.settingDescription}>
-                    운동 중 긴급 연락처에 위치를 공유합니다
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.shareLocation}
-                onValueChange={() => handleToggle("shareLocation")}
-              />
-            </View>
-
-            <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: `${Colors.red[500]}20` },
-                  ]}
-                >
-                  <AlertTriangle
-                    size={20}
-                    color={Colors.red[400]}
-                    strokeWidth={2}
-                  />
-                </View>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>SOS 버튼</Text>
-                  <Text style={styles.settingDescription}>
-                    위급 상황 시 빠르게 도움을 요청합니다
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={settings.sosButton}
-                onValueChange={() => handleToggle("sosButton")}
-              />
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* 긴급 연락처 섹션 */}
-        <Animated.View
-          entering={FadeInUp.delay(200).duration(400)}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>긴급 연락처</Text>
-            <Text style={styles.contactCount}>
-              {emergencyContacts.length}/3
-            </Text>
-          </View>
-
-          <View style={styles.sectionContent}>
-            {emergencyContacts.map((contact, index) => (
-              <View key={contact.id} style={styles.contactItem}>
-                <View style={styles.settingLeft}>
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      { backgroundColor: `${Colors.emerald[500]}20` },
-                    ]}
-                  >
-                    <User
-                      size={20}
-                      color={Colors.emerald[400]}
-                      strokeWidth={2}
-                    />
-                  </View>
-                  <View style={styles.settingText}>
-                    <Text style={styles.settingLabel}>{contact.name}</Text>
-                    <Text style={styles.settingDescription}>
-                      {contact.phone}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteContact(contact.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.deleteButtonText}>삭제</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {/* 연락처 추가 폼 */}
-            {isAddingContact ? (
-              <View style={styles.addContactForm}>
-                <View style={styles.inputRow}>
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>이름</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={newContactName}
-                      onChangeText={setNewContactName}
-                      placeholder="예: 엄마"
-                      placeholderTextColor={Colors.zinc[600]}
-                    />
-                  </View>
-                  <View style={[styles.inputContainer, { flex: 1.5 }]}>
-                    <Text style={styles.inputLabel}>전화번호</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={newContactPhone}
-                      onChangeText={setNewContactPhone}
-                      placeholder="010-0000-0000"
-                      placeholderTextColor={Colors.zinc[600]}
-                      keyboardType="phone-pad"
-                    />
-                  </View>
-                </View>
-                <View style={styles.formButtons}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => {
-                      setIsAddingContact(false);
-                      setNewContactName("");
-                      setNewContactPhone("");
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.cancelButtonText}>취소</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={handleAddContact}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.saveButtonText}>저장</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.addContactButton}
-                onPress={() => setIsAddingContact(true)}
-                activeOpacity={0.7}
-                disabled={emergencyContacts.length >= 3}
-              >
-                <Phone size={20} color={Colors.emerald[400]} strokeWidth={2} />
-                <Text style={styles.addContactText}>
-                  {emergencyContacts.length >= 3
-                    ? "최대 3명까지 등록 가능"
-                    : "긴급 연락처 추가"}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Animated.View>
-
         {/* 안내 메시지 */}
         <Animated.View
-          entering={FadeInUp.delay(300).duration(400)}
+          entering={FadeInUp.delay(100).duration(400)}
           style={styles.infoCard}
         >
-          <Shield size={24} color={Colors.emerald[400]} strokeWidth={2} />
+          <Shield size={24} color={Colors.purple[400]} strokeWidth={2} />
           <View style={styles.infoText}>
             <Text style={styles.infoTitle}>안전한 러닝을 위한 팁</Text>
             <Text style={styles.infoDescription}>
@@ -382,6 +222,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.zinc[950],
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[400],
+  },
+  savingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.sm,
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  savingText: {
+    marginLeft: Spacing.sm,
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+  },
   scrollView: {
     flex: 1,
   },
@@ -391,23 +255,14 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: Spacing.xl,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-    marginLeft: Spacing.xs,
-  },
   sectionTitle: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[500],
+    marginBottom: Spacing.md,
+    marginLeft: Spacing.xs,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-  contactCount: {
-    fontSize: FontSize.sm,
-    color: Colors.zinc[500],
   },
   sectionContent: {
     backgroundColor: Colors.zinc[900],
@@ -417,14 +272,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   settingItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.zinc[800],
-  },
-  contactItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -458,89 +305,12 @@ const styles = StyleSheet.create({
     color: Colors.zinc[500],
     marginTop: 2,
   },
-  deleteButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  deleteButtonText: {
-    fontSize: FontSize.sm,
-    color: Colors.red[500],
-    fontWeight: FontWeight.medium,
-  },
-  addContactButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.sm,
-    padding: Spacing.md,
-  },
-  addContactText: {
-    fontSize: FontSize.base,
-    color: Colors.emerald[400],
-    fontWeight: FontWeight.medium,
-  },
-  addContactForm: {
-    padding: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.zinc[800],
-  },
-  inputRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  inputContainer: {
-    flex: 1,
-  },
-  inputLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.zinc[400],
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    backgroundColor: Colors.zinc[800],
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: FontSize.base,
-    color: Colors.zinc[50],
-    borderWidth: 1,
-    borderColor: Colors.zinc[700],
-  },
-  formButtons: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: Colors.zinc[800],
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.sm,
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    fontSize: FontSize.base,
-    color: Colors.zinc[400],
-    fontWeight: FontWeight.medium,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: Colors.emerald[500],
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.sm,
-    alignItems: "center",
-  },
-  saveButtonText: {
-    fontSize: FontSize.base,
-    color: "#fff",
-    fontWeight: FontWeight.semibold,
-  },
   infoCard: {
     flexDirection: "row",
-    backgroundColor: `${Colors.emerald[500]}10`,
+    backgroundColor: `${Colors.purple[500]}10`,
     borderRadius: BorderRadius["2xl"],
     borderWidth: 1,
-    borderColor: `${Colors.emerald[500]}30`,
+    borderColor: `${Colors.purple[500]}30`,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
@@ -550,7 +320,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
-    color: Colors.emerald[400],
+    color: Colors.purple[400],
     marginBottom: Spacing.sm,
   },
   infoDescription: {

@@ -387,5 +387,59 @@ export const routeApi = {
   },
 };
 
+// ============================================
+// 설정 API
+// ============================================
+
+export const settingsApi = {
+  /**
+   * 사용자 설정 조회
+   */
+  async getSettings(): Promise<
+    ApiResponse<{
+      dark_mode: boolean;
+      language: string;
+      push_enabled: boolean;
+      workout_reminder: boolean;
+      goal_achievement: boolean;
+      community_activity: boolean;
+      auto_lap: boolean;
+      night_safety_mode: boolean;
+      auto_night_mode: boolean;
+    }>
+  > {
+    return apiClient.get("/api/v1/users/me/settings");
+  },
+
+  /**
+   * 사용자 설정 업데이트
+   */
+  async updateSettings(data: {
+    dark_mode?: boolean;
+    language?: string;
+    push_enabled?: boolean;
+    workout_reminder?: boolean;
+    goal_achievement?: boolean;
+    community_activity?: boolean;
+    auto_lap?: boolean;
+    night_safety_mode?: boolean;
+    auto_night_mode?: boolean;
+  }): Promise<
+    ApiResponse<{
+      dark_mode: boolean;
+      language: string;
+      push_enabled: boolean;
+      workout_reminder: boolean;
+      goal_achievement: boolean;
+      community_activity: boolean;
+      auto_lap: boolean;
+      night_safety_mode: boolean;
+      auto_night_mode: boolean;
+    }>
+  > {
+    return apiClient.patch("/api/v1/users/me/settings", data);
+  },
+};
+
 // 기본 내보내기
 export default apiClient;

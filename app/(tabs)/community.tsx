@@ -214,7 +214,6 @@ export default function CommunityScreen() {
         <TabsList style={styles.tabsList}>
           <TabsTrigger value="popular">인기</TabsTrigger>
           <TabsTrigger value="recent">최신</TabsTrigger>
-          <TabsTrigger value="following">팔로잉</TabsTrigger>
         </TabsList>
 
         <TabsContent value="popular">
@@ -237,15 +236,6 @@ export default function CommunityScreen() {
               <RouteCard key={route.id} route={route} />
             ))}
           </ScrollView>
-        </TabsContent>
-
-        <TabsContent value="following">
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>팔로우한 사용자가 없습니다</Text>
-            <TouchableOpacity>
-              <Text style={styles.emptyLink}>추천 러너 보기</Text>
-            </TouchableOpacity>
-          </View>
         </TabsContent>
       </Tabs>
 
