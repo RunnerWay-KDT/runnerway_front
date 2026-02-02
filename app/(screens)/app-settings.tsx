@@ -5,12 +5,11 @@ import {
   Info,
   Lock,
   Moon,
-  Shield,
   Smartphone,
   Trash2,
   Volume2,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   ScrollView,
@@ -18,6 +17,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +30,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
+import { settingsApi } from "../../utils/api";
 
 interface SettingItem {
   id: string;
@@ -51,7 +52,11 @@ interface SettingSection {
 export default function AppSettingsScreen() {
   const router = useRouter();
 
-  // 설정 상태
+  // 로딩 상태
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // 설정 상태 (현재)
   const [settings, setSettings] = useState({
     darkMode: true,
     pushNotification: true,
@@ -60,16 +65,124 @@ export default function AppSettingsScreen() {
     communityActivity: false,
     soundEffect: true,
     vibration: true,
+    autoLap: true,
+    nightSafetyMode: false,
+    autoNightMode: false,
   });
 
+  // 초기 설정 상태 (변경 감지용)
+  const [initialSettings, setInitialSettings] = useState(settings);
+
+  // 컴포넌트 마운트 시 설정 로드
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  // 백엔드에서 설정 로드
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await settingsApi.getSettings();
+
+      if (response.success && response.data) {
+        const apiSettings = response.data;
+        const loadedSettings = {
+          darkMode: apiSettings.dark_mode,
+          pushNotification: apiSettings.push_enabled,
+          workoutReminder: apiSettings.workout_reminder,
+          goalAchievement: apiSettings.goal_achievement,
+          communityActivity: apiSettings.community_activity,
+          soundEffect: true, // 로컬 전용
+          vibration: true, // 로컬 전용
+          autoLap: apiSettings.auto_lap,
+          nightSafetyMode: apiSettings.night_safety_mode,
+          autoNightMode: apiSettings.auto_night_mode,
+        };
+        setSettings(loadedSettings);
+        setInitialSettings(loadedSettings); // 초기값 저장
+      }
+    } catch (error) {
+      console.error("설정 로드 실패:", error);
+      Alert.alert("오류", "설정을 불러오는데 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 설정 토글 핸들러 (즉시 저장 제거)
   const handleToggle = (key: keyof typeof settings) => {
+    // UI만 업데이트
     setSettings((prev) => ({
       ...prev,
       [key]: !prev[key],
     }));
+  };
 
-    // TODO: API 호출
-    // PATCH /api/v1/users/me/settings
+  // 뒤로가기 시 변경사항 저장
+  const handleBack = async () => {
+    // 변경사항이 있는지 확인
+    const hasChanges = Object.keys(settings).some(
+      (key) =>
+        settings[key as keyof typeof settings] !==
+        initialSettings[key as keyof typeof settings],
+    );
+
+    if (!hasChanges) {
+      // 변경사항 없으면 바로 뒤로가기
+      router.back();
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // API 필드명으로 매핑
+      const apiFieldMap: Record<string, string> = {
+        darkMode: "dark_mode",
+        pushNotification: "push_enabled",
+        workoutReminder: "workout_reminder",
+        goalAchievement: "goal_achievement",
+        communityActivity: "community_activity",
+        autoLap: "auto_lap",
+        nightSafetyMode: "night_safety_mode",
+        autoNightMode: "auto_night_mode",
+      };
+
+      // 변경된 필드만 추출
+      const changedFields: Record<string, boolean> = {};
+      Object.keys(settings).forEach((key) => {
+        const typedKey = key as keyof typeof settings;
+        if (
+          settings[typedKey] !== initialSettings[typedKey] &&
+          key !== "soundEffect" && // 로컬 전용 제외
+          key !== "vibration" // 로컬 전용 제외
+        ) {
+          const apiField = apiFieldMap[key];
+          if (apiField) {
+            changedFields[apiField] = settings[typedKey] as boolean;
+          }
+        }
+      });
+
+      // 변경된 필드가 있으면 저장
+      if (Object.keys(changedFields).length > 0) {
+        const response = await settingsApi.updateSettings(changedFields);
+
+        if (!response.success) {
+          Alert.alert("오류", "설정 저장에 실패했습니다.");
+          setSaving(false);
+          return;
+        }
+      }
+
+      // 저장 성공 후 뒤로가기
+      router.back();
+    } catch (error) {
+      console.error("설정 저장 실패:", error);
+      Alert.alert("오류", "설정 저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -185,14 +298,6 @@ export default function AppSettingsScreen() {
     {
       title: "보안",
       items: [
-        {
-          id: "safetySettings",
-          icon: Shield,
-          label: "안전 설정",
-          description: "야간 모드, 긴급 연락처",
-          type: "link",
-          route: "/(screens)/safety-settings",
-        },
         {
           id: "privacy",
           icon: Lock,
@@ -323,19 +428,35 @@ export default function AppSettingsScreen() {
       <ScreenHeader
         title="앱 설정"
         subtitle="알림 및 앱 환경을 설정하세요"
-        onBack={() => router.back()}
+        onBack={handleBack}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {settingSections.map((section, index) => renderSection(section, index))}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.blue[500]} />
+          <Text style={styles.loadingText}>설정을 불러오는 중...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {saving && (
+            <View style={styles.savingIndicator}>
+              <ActivityIndicator size="small" color={Colors.blue[500]} />
+              <Text style={styles.savingText}>저장 중...</Text>
+            </View>
+          )}
 
-        {/* 하단 여백 */}
-        <View style={{ height: Spacing["3xl"] }} />
-      </ScrollView>
+          {settingSections.map((section, index) =>
+            renderSection(section, index),
+          )}
+
+          {/* 하단 여백 */}
+          <View style={{ height: Spacing["3xl"] }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -344,6 +465,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.zinc[950],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[400],
+  },
+  savingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.sm,
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  savingText: {
+    marginLeft: Spacing.sm,
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
   },
   scrollView: {
     flex: 1,
