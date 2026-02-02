@@ -39,6 +39,7 @@ export const API_CONFIG = {
       UPDATE_PROFILE: "/api/v1/users/me",
     },
     ROUTES: {
+      RECOMMEND: "/api/v1/routes/recommend",
       CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
     },
   },

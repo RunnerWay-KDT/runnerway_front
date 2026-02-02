@@ -361,6 +361,16 @@ export const routeApi = {
   > {
     return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.CUSTOM_DRAWING, data);
   },
+
+  /**
+   * 경로 추천 요청 (GPT + OSMNX)
+   */
+  async recommendRoute(data: RouteRequest): Promise<RecommendRouteResponse> {
+    return apiClient.post<RecommendRouteResponse>(
+      API_CONFIG.ENDPOINTS.ROUTES.RECOMMEND,
+      data,
+    );
+  },
 };
 
 // 기본 내보내기
