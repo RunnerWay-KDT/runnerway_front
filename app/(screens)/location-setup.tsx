@@ -13,6 +13,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
+import { routeApi } from "../../utils/api";
 
 export default function LocationSetupScreen() {
   const router = useRouter();
@@ -38,6 +39,13 @@ export default function LocationSetupScreen() {
       Alert.alert("위치 선택", "위치를 선택해주세요");
       return;
     }
+
+    // 백그라운드 고도 데이터 수집 시작 (결과를 기다리지 않음)
+    routeApi.prefetchElevation({
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng,
+      radius: 2000,
+    }).catch(err => console.log("Elevation prefetch failed:", err));
 
     const navigationParams = {
       startLat: selectedLocation.lat.toString(),

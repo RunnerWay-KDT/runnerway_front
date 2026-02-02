@@ -41,6 +41,7 @@ export const API_CONFIG = {
     ROUTES: {
       RECOMMEND: "/api/v1/routes/recommend",
       CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
+      PREFETCH_ELEVATION: "/api/v1/routes/prefetch-elevation",
     },
   },
 };

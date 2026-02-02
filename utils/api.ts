@@ -371,6 +371,20 @@ export const routeApi = {
       data,
     );
   },
+
+  /**
+   * 고도 데이터 프리페칭 요청 (백그라운드 수집 시작)
+   */
+  async prefetchElevation(data: {
+    lat: number;
+    lng: number;
+    radius?: number;
+  }): Promise<ApiResponse> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.PREFETCH_ELEVATION, {
+      ...data,
+      radius: data.radius || 2000,
+    });
+  },
 };
 
 // 기본 내보내기
