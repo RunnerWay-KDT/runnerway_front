@@ -27,8 +27,13 @@ interface LiveKakaoMapProps {
   currentPosition?: {
     lat: number;
     lng: number;
+    heading?: number;
   };
   polyline?: {
+    lat: number;
+    lng: number;
+  }[];
+  actualPath?: {
     lat: number;
     lng: number;
   }[];
@@ -38,9 +43,10 @@ export function LiveKakaoMap({
   routePath = "heart",
   customDrawing = null,
   progress = 0,
-  center = { lat: 37.5665, lng: 126.978 },
+  center = { lat: 37.5007, lng: 127.0364 },
   currentPosition,
   polyline = [],
+  actualPath = [],
 }: LiveKakaoMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,6 +149,34 @@ export function LiveKakaoMap({
     }
   }, [progress, isMapReady, calculateCurrentPosition]);
 
+  // currentPosition이 변경될 때마다 지도 업데이트 (실시간 GPS 추적)
+  useEffect(() => {
+    if (webViewRef.current && isMapReady && currentPosition) {
+      webViewRef.current.postMessage(
+        JSON.stringify({
+          type: "updateCurrentPosition",
+          position: {
+            lat: currentPosition.lat,
+            lng: currentPosition.lng,
+            heading: currentPosition.heading,
+          },
+        }),
+      );
+    }
+  }, [currentPosition, isMapReady]);
+
+  // actualPath가 변경될 때마다 실제 이동 경로 업데이트
+  useEffect(() => {
+    if (webViewRef.current && isMapReady && actualPath.length > 0) {
+      webViewRef.current.postMessage(
+        JSON.stringify({
+          type: "updateActualPath",
+          path: actualPath,
+        }),
+      );
+    }
+  }, [actualPath, isMapReady]);
+
   // HTML 콘텐츠를 한 번만 생성 (재렌더링 방지)
   const htmlContent = useMemo(
     () => `
@@ -190,16 +224,35 @@ export function LiveKakaoMap({
       background: #10b981;
       opacity: 0.3;
       animation: pulse 2s infinite;
+      top: 5px;
+      left: 5px;
     }
     .current-marker {
       position: absolute;
-      top: 5px;
-      left: 5px;
+      top: 10px;
+      left: 10px;
       width: 20px;
       height: 20px;
       border-radius: 50%;
       background: #10b981;
       border: 3px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .direction-arrow {
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-bottom: 14px solid #10b981;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+    }
+    #currentMarkerContainer {
+      transition: transform 0.3s ease-out;
+      transform-origin: center center;
     }
   </style>
 </head>
@@ -211,7 +264,7 @@ export function LiveKakaoMap({
   
   <script>
     (function() {
-      var map, completedPolyline, currentMarker;
+      var map, completedPolyline, actualPolyline, currentMarker;
       var fullPath = [];
       
       try {
@@ -261,7 +314,7 @@ export function LiveKakaoMap({
         });
         fullPolyline.setMap(map);
 
-        // 완료된 경로 폴리라인
+        // 완료된 경로 폴리라인 (진행률 기반) - GPS 운동에서는 사용 안함
         completedPolyline = new kakao.maps.Polyline({
           path: [],
           strokeWeight: 6,
@@ -269,7 +322,18 @@ export function LiveKakaoMap({
           strokeOpacity: 1,
           strokeStyle: 'solid'
         });
-        completedPolyline.setMap(map);
+        // GPS 기반 운동에서는 표시하지 않음
+        // completedPolyline.setMap(map);
+
+        // 실제 이동 경로 폴리라인 (GPS 기반)
+        actualPolyline = new kakao.maps.Polyline({
+          path: [],
+          strokeWeight: 6,
+          strokeColor: '#10b981',
+          strokeOpacity: 0.9,
+          strokeStyle: 'solid'
+        });
+        actualPolyline.setMap(map);
 
         // 시작점 마커
         var startMarker = document.createElement('div');
@@ -285,8 +349,9 @@ export function LiveKakaoMap({
 
         // 현재 위치 마커
         var markerContainer = document.createElement('div');
-        markerContainer.style.cssText = 'position:relative;width:30px;height:30px;';
-        markerContainer.innerHTML = '<div class="pulse-ring"></div><div class="current-marker"></div>';
+        markerContainer.id = 'currentMarkerContainer';
+        markerContainer.style.cssText = 'position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center;';
+        markerContainer.innerHTML = '<div class="direction-arrow"></div><div class="pulse-ring"></div><div class="current-marker"></div>';
 
         currentMarker = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(${initialPos.lat}, ${initialPos.lng}),
@@ -320,18 +385,37 @@ export function LiveKakaoMap({
       window.addEventListener('message', function(event) {
         try {
           var data = JSON.parse(event.data);
-          if (data.type === 'updatePosition' && map && currentMarker && completedPolyline) {
+          
+          // 실시간 GPS 위치 업데이트
+          if (data.type === 'updateCurrentPosition' && map && currentMarker) {
             var newPos = new kakao.maps.LatLng(data.position.lat, data.position.lng);
             currentMarker.setPosition(newPos);
             
-            // 완료된 경로 업데이트
-            var progressIndex = Math.floor(data.progress * (fullPath.length - 1));
-            var completedPath = fullPath.slice(0, progressIndex + 1);
-            if (completedPath.length > 0) {
-              completedPath.push(newPos);
+            // heading 정보가 있으면 방향 화살표 회전
+            if (data.position.heading !== null && data.position.heading !== undefined) {
+              var markerEl = document.getElementById('currentMarkerContainer');
+              if (markerEl) {
+                markerEl.style.transformOrigin = 'center center';
+                markerEl.style.transform = 'rotate(' + data.position.heading + 'deg)';
+              }
             }
-            completedPolyline.setPath(completedPath);
             
+            // 현재 위치를 부드럽게 중심으로 이동
+            map.panTo(newPos);
+          }
+          // 실제 이동 경로 업데이트
+          else if (data.type === 'updateActualPath' && map && actualPolyline) {
+            var actualPath = data.path.map(function(point) {
+              return new kakao.maps.LatLng(point.lat, point.lng);
+            });
+            actualPolyline.setPath(actualPath);
+          }
+          // 진행률 기반 위치 업데이트 (GPS 운동에서는 사용 안함)
+          else if (data.type === 'updatePosition' && map && currentMarker) {
+            var newPos = new kakao.maps.LatLng(data.position.lat, data.position.lng);
+            currentMarker.setPosition(newPos);
+            
+            // 진행률 기반 경로 업데이트는 제거 (GPS 경로만 사용)
             // 현재 위치를 중심으로 지도 이동
             map.panTo(newPos);
           }

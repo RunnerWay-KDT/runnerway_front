@@ -6,7 +6,6 @@ import {
   Heart,
   LogOut,
   MapPin,
-  Settings,
   Shield,
   TrendingUp,
   Trophy,
@@ -62,7 +61,6 @@ export default function ProfileScreen() {
     { Icon: Trophy, label: "내 기록", route: "/(screens)/workout-history" },
     { Icon: Bookmark, label: "저장한 경로", route: "/(screens)/saved-routes" },
     { Icon: Shield, label: "안전 설정", route: "/(screens)/safety-settings" },
-    { Icon: Settings, label: "앱 설정", route: "/(screens)/app-settings" },
   ];
 
   const handleLogout = async () => {
@@ -98,12 +96,20 @@ export default function ProfileScreen() {
           entering={FadeInUp.duration(400)}
           style={styles.profileSection}
         >
-          <LinearGradient
-            colors={[Colors.emerald[400], Colors.emerald[600]]}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarText}>{getUserInitial()}</Text>
-          </LinearGradient>
+          {user?.avatar ? (
+            <Animated.Image
+              source={{ uri: user.avatar }}
+              style={styles.avatarImage}
+              entering={FadeInUp.duration(300)}
+            />
+          ) : (
+            <LinearGradient
+              colors={[Colors.emerald[400], Colors.emerald[600]]}
+              style={styles.avatar}
+            >
+              <Text style={styles.avatarText}>{getUserInitial()}</Text>
+            </LinearGradient>
+          )}
           <Text style={styles.userName}>{user?.name || "러너"}</Text>
           <Text style={styles.userEmail}>
             {user?.email || "user@example.com"}
@@ -203,6 +209,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: Spacing.md,
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: Spacing.md,
+    borderWidth: 3,
+    borderColor: Colors.emerald[400],
   },
   avatarText: {
     fontSize: FontSize["4xl"],

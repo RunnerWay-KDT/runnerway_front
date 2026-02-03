@@ -1,4 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Location from "expo-location";
+import { Magnetometer } from "expo-sensors";
 import {
   Flame,
   Pause,
@@ -8,8 +10,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 import Animated, {
   FadeInUp,
   useAnimatedStyle,
@@ -26,6 +28,12 @@ import {
   Spacing,
 } from "../../constants/theme";
 
+interface LocationCoords {
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -33,17 +41,274 @@ export default function WorkoutScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const [time, setTime] = useState(0);
   const [distance, setDistance] = useState(0);
-  const [pace, setPace] = useState("5'30\"");
+  const [pace, setPace] = useState("0'00\"");
   const [sheetState, setSheetState] = useState<
     "collapsed" | "half" | "expanded"
   >("collapsed");
   const [voiceGuide, setVoiceGuide] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState<{
+    lat: number;
+    lng: number;
+    heading?: number;
+  } | null>(null);
+  const [actualRoute, setActualRoute] = useState<
+    { lat: number; lng: number }[]
+  >([]);
+  const [splits, setSplits] = useState<
+    { start: number; end: number; pace: string; time: number }[]
+  >([]);
+
+  // GPS 관련 상태
+  const locationSubscription = useRef<Location.LocationSubscription | null>(
+    null,
+  );
+  const magnetometerSubscription = useRef<{ remove: () => void } | null>(null);
+  const lastLocation = useRef<LocationCoords | null>(null);
+  const routeCoordinates = useRef<LocationCoords[]>([]);
+  const pathUpdateCounter = useRef(0);
+  const lastSplitDistance = useRef(0);
+  const lastSplitTime = useRef(0);
+
+  // params에서 경로 정보 가져오기
+  const routePathFromParams = params.routePath
+    ? JSON.parse(params.routePath as string)
+    : null;
 
   const targetDistance = parseFloat((params.targetDistance as string) || "4.2");
   const iconName = (params.shapeIconName as string) || "heart";
 
   const progress = Math.min(distance / targetDistance, 1);
   const progressWidth = useSharedValue(0);
+
+  // Haversine 공식으로 두 좌표 간 거리 계산 (미터)
+  const calculateDistance = useCallback(
+    (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371e3; // 지구 반지름 (미터)
+      const φ1 = (lat1 * Math.PI) / 180;
+      const φ2 = (lat2 * Math.PI) / 180;
+      const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+      const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+      const a =
+        Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      return R * c; // 미터 단위
+    },
+    [],
+  );
+
+  // 위치 업데이트 처리
+  const handleLocationUpdate = useCallback(
+    (location: Location.LocationObject) => {
+      const newCoords: LocationCoords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        timestamp: location.timestamp,
+      };
+
+      // 위치만 업데이트 (heading은 Magnetometer로 별도 관리)
+      setCurrentLocation((prev) => ({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        heading: prev?.heading, // 기존 heading 유지
+      }));
+
+      // 경로에 좌표 추가
+      routeCoordinates.current.push(newCoords);
+
+      // 5개의 좌표마다 actualRoute 업데이트 (성능 최적화)
+      pathUpdateCounter.current += 1;
+      if (pathUpdateCounter.current >= 5) {
+        pathUpdateCounter.current = 0;
+        setActualRoute(
+          routeCoordinates.current.map((coord) => ({
+            lat: coord.latitude,
+            lng: coord.longitude,
+          })),
+        );
+      }
+
+      // 이전 위치가 있으면 거리 계산
+      if (lastLocation.current) {
+        const distanceInMeters = calculateDistance(
+          lastLocation.current.latitude,
+          lastLocation.current.longitude,
+          newCoords.latitude,
+          newCoords.longitude,
+        );
+
+        // 거리가 너무 크면 (50m 이상) GPS 오류로 간주하고 무시
+        if (distanceInMeters < 50 && distanceInMeters > 0) {
+          setDistance((prev) => {
+            const newDistance = prev + distanceInMeters / 1000; // km로 변환
+
+            // 1km 구간 완주 시 구간 기록 저장
+            const currentKm = Math.floor(newDistance);
+            const lastKm = Math.floor(lastSplitDistance.current);
+            if (currentKm > lastKm && currentKm > 0) {
+              setTime((currentTime) => {
+                const splitTimeDiff = currentTime - lastSplitTime.current;
+                const mins = Math.floor(splitTimeDiff / 60);
+                const secs = Math.round(splitTimeDiff % 60);
+
+                // 30분 이상이면 -- 표시
+                const splitPace =
+                  mins >= 30
+                    ? "--'--\""
+                    : `${mins}'${secs.toString().padStart(2, "0")}"`;
+
+                setSplits((prevSplits) => [
+                  ...prevSplits,
+                  {
+                    start: lastKm,
+                    end: currentKm,
+                    pace: splitPace,
+                    time: currentTime,
+                  },
+                ]);
+
+                lastSplitDistance.current = newDistance;
+                lastSplitTime.current = currentTime;
+                return currentTime;
+              });
+            }
+
+            // 페이스 계산 (시간이 있을 때만)
+            setTime((currentTime) => {
+              if (newDistance > 0 && currentTime > 0) {
+                const currentPace = currentTime / 60 / newDistance; // 분/km
+                const mins = Math.floor(currentPace);
+                const secs = Math.round((currentPace - mins) * 60);
+
+                // 30분 이상이면 -- 표시
+                if (mins >= 30) {
+                  setPace("--'--\"");
+                } else {
+                  setPace(`${mins}'${secs.toString().padStart(2, "0")}"`);
+                }
+              }
+              return currentTime;
+            });
+
+            return newDistance;
+          });
+        }
+      }
+
+      lastLocation.current = newCoords;
+    },
+    [calculateDistance],
+  );
+
+  // GPS 권한 요청 및 위치 추적 시작
+  useEffect(() => {
+    let isMounted = true;
+
+    const setupLocation = async () => {
+      try {
+        // 위치 권한 요청
+        const { status } = await Location.requestForegroundPermissionsAsync();
+
+        if (status !== "granted") {
+          Alert.alert(
+            "위치 권한 필요",
+            "운동 기록을 위해 위치 권한이 필요합니다.",
+            [{ text: "확인" }],
+          );
+          return;
+        }
+
+        // 현재 위치 가져오기 (초기 지도 중심)
+        try {
+          const currentPos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+          });
+          if (isMounted) {
+            setCurrentLocation({
+              lat: currentPos.coords.latitude,
+              lng: currentPos.coords.longitude,
+              heading: 0, // 초기값은 0 (북쪽), Magnetometer가 곧 업데이트할 것
+            });
+          }
+        } catch (error) {
+          console.log("초기 위치 가져오기 실패:", error);
+        }
+
+        // 위치 추적 시작
+        locationSubscription.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 1000, // 1초마다 업데이트
+            distanceInterval: 1, // 1미터 이동 시 업데이트
+          },
+          (location) => {
+            if (!isPaused && isMounted) {
+              handleLocationUpdate(location);
+            }
+          },
+        );
+      } catch (error) {
+        console.error("위치 설정 오류:", error);
+        Alert.alert("오류", "위치 추적을 시작할 수 없습니다.");
+      }
+    };
+
+    setupLocation();
+
+    return () => {
+      isMounted = false;
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+      }
+    };
+  }, [isPaused, handleLocationUpdate]);
+
+  // 나침반(Magnetometer) 센서로 디바이스 방향 감지
+  useEffect(() => {
+    let isMounted = true;
+
+    const startCompass = async () => {
+      try {
+        // Magnetometer 업데이트 간격 설정 (500ms)
+        Magnetometer.setUpdateInterval(500);
+
+        // Magnetometer 구독
+        magnetometerSubscription.current = Magnetometer.addListener((data) => {
+          if (!isMounted) return;
+
+          // 자기장 데이터로 방위각(heading) 계산
+          const { x, y } = data;
+          let heading = Math.atan2(y, x) * (180 / Math.PI);
+
+          // 0-360도 범위로 정규화
+          if (heading < 0) {
+            heading += 360;
+          }
+
+          // 현재 위치에 heading 업데이트
+          setCurrentLocation((prev) => {
+            if (prev) {
+              return { ...prev, heading };
+            }
+            return prev;
+          });
+        });
+      } catch (error) {
+        console.error("나침반 센서 오류:", error);
+      }
+    };
+
+    startCompass();
+
+    return () => {
+      isMounted = false;
+      if (magnetometerSubscription.current) {
+        magnetometerSubscription.current.remove();
+      }
+    };
+  }, []);
 
   // 진행률 애니메이션
   useEffect(() => {
@@ -54,36 +319,16 @@ export default function WorkoutScreen() {
     width: `${progressWidth.value}%`,
   }));
 
-  // 타이머 로직 개선 - time 의존성 제거하고 함수형 업데이트 사용
+  // 타이머 로직 - GPS가 거리를 업데이트하므로 시간만 관리
   useEffect(() => {
     if (!isPaused) {
       const interval = setInterval(() => {
-        setTime((prevTime) => {
-          const newTime = prevTime + 1;
-          return newTime;
-        });
-
-        setDistance((prevDistance) => {
-          const newDistance = prevDistance + 0.002;
-
-          // 페이스 계산을 여기서 직접 수행
-          if (newDistance > 0) {
-            setTime((currentTime) => {
-              const currentPace = currentTime / 60 / newDistance;
-              const mins = Math.floor(currentPace);
-              const secs = Math.round((currentPace - mins) * 60);
-              setPace(`${mins}'${secs.toString().padStart(2, "0")}"`);
-              return currentTime;
-            });
-          }
-
-          return newDistance;
-        });
+        setTime((prevTime) => prevTime + 1);
       }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [isPaused]); // time 제거
+  }, [isPaused]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -109,10 +354,27 @@ export default function WorkoutScreen() {
   const calories = Math.round(distance * 60);
   const remainingDistance = Math.max(0, targetDistance - distance);
 
+  // 지도에 표시할 경로 데이터 (미리 정해진 경로)
+  const plannedRoute = routePathFromParams
+    ? routePathFromParams.map((point: any) => ({
+        lat: point.latitude || point.lat,
+        lng: point.longitude || point.lng,
+      }))
+    : [];
+
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <LiveKakaoMap routePath={iconName} progress={progress} />
+      <LiveKakaoMap
+        routePath={iconName}
+        progress={progress}
+        currentPosition={currentLocation || undefined}
+        polyline={plannedRoute.length > 0 ? plannedRoute : undefined}
+        actualPath={actualRoute.length > 0 ? actualRoute : undefined}
+        center={
+          currentLocation || plannedRoute[0] || { lat: 37.5007, lng: 127.0364 }
+        }
+      />
 
       {/* Top Controls */}
       <View style={styles.header}>
@@ -225,14 +487,24 @@ export default function WorkoutScreen() {
             </View>
 
             <View style={styles.splitList}>
-              <View style={styles.splitItem}>
-                <Text style={styles.splitLabel}>0-1 km</Text>
-                <Text style={styles.splitValue}>{"6'15\""}</Text>
-              </View>
-              <View style={styles.splitItem}>
-                <Text style={styles.splitLabel}>1-2 km</Text>
-                <Text style={styles.splitValue}>{"5'58\""}</Text>
-              </View>
+              {splits.length === 0 ? (
+                <View style={styles.splitItem}>
+                  <Text style={styles.splitLabel}>
+                    1km 이상 달리면 구간이 표시됩니다
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {splits.map((split, index) => (
+                    <View key={index} style={styles.splitItem}>
+                      <Text style={styles.splitLabel}>
+                        {split.start}-{split.end} km
+                      </Text>
+                      <Text style={styles.splitValue}>{split.pace}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
               <View style={styles.splitItemCurrent}>
                 <Text style={styles.splitLabelCurrent}>현재 구간</Text>
                 <Text style={styles.splitValueCurrent}>{pace}</Text>

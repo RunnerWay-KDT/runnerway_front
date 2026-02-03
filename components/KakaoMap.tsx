@@ -31,7 +31,7 @@ interface KakaoMapProps {
 export function KakaoMap({
   routePath = "heart",
   customDrawing = null,
-  center = { lat: 37.5665, lng: 126.978 },
+  center = { lat: 37.5007, lng: 127.0364 },
   markers = [],
   polyline = [],
 }: KakaoMapProps) {
