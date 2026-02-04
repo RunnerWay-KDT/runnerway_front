@@ -75,3 +75,18 @@ export interface UserProfileResponse {
   data: UserData;
   message: string;
 }
+
+// ============================================
+// 경로 추천 관련 타입
+// ============================================
+
+export interface RouteRequest {
+  lat: number;
+  lng: number;
+  prompt: string;
+}
+
+export interface RecommendRouteResponse {
+  candidates?: Array<unknown>;
+  [key: string]: unknown;
+}

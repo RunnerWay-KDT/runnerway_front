@@ -11,6 +11,8 @@ import type {
   UserProfileResponse,
   UpdateProfileRequest,
   ApiResponse,
+  RouteRequest,
+  RecommendRouteResponse,
 } from "../types/api";
 
 // ============================================
@@ -359,6 +361,61 @@ export const routeApi = {
   > {
     return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.CUSTOM_DRAWING, data);
   },
+
+  async generateGpsArt(body: {
+    route_id?: string;
+    shape_id?: string;
+    svg_path?: string; // 프리셋인데 DB에 없을 때 전달, 백엔드가 svg_url에 저장
+    start?: { lat: number; lng: number };
+    target_distance_km: number;
+    name?: string;
+    enable_rotation?: boolean;
+    rotation_angles?: number[] | null;
+  }): Promise<{
+    routes: Array<{
+      id: number;
+      angle: number;
+      distance_km: number;
+      coordinates: Array<{ lat: number; lng: number }>;
+      similarity_score: number;
+    }>;
+    route_id: string;
+    option_ids: string[];
+    scaled_drawing?: unknown;
+    best_angle?: number;
+    validation?: unknown;
+  }> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.GENERATE_GPS_ART, body,);
+  },
+
+  async getRouteOptions(routeId: string) {
+    return apiClient.get(`/api/v1/routes/${routeId}/options`);
+  },
+
+  /**
+   * 경로 추천 요청 (GPT + OSMNX)
+   */
+  async recommendRoute(data: RouteRequest): Promise<RecommendRouteResponse> {
+    return apiClient.post<RecommendRouteResponse>(
+      API_CONFIG.ENDPOINTS.ROUTES.RECOMMEND,
+      data,
+    );
+  },
+
+  /**
+   * 고도 데이터 프리페칭 요청 (백그라운드 수집 시작)
+   */
+  async prefetchElevation(data: {
+    lat: number;
+    lng: number;
+    radius?: number;
+  }): Promise<ApiResponse> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.PREFETCH_ELEVATION, {
+      ...data,
+      radius: data.radius ?? 2000,
+    });
+  },
+
 };
 
 // ============================================

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
+import { routeApi } from "../../utils/api";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,6 +12,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import { Colors, FontSize, FontWeight, Spacing } from "../../constants/theme";
+import { PRESET_SVG_PATHS } from "../../constants/config";
 
 const { width } = Dimensions.get("window");
 
@@ -19,6 +21,7 @@ export default function GeneratingScreen() {
   const params = useLocalSearchParams();
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const rotation = useSharedValue(0);
 
@@ -30,9 +33,126 @@ export default function GeneratingScreen() {
 
   useEffect(() => {
     rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
-  }, [rotation]);
 
-  useEffect(() => {
+    const mode = params.mode as string | undefined;
+
+    // running: recommendRoute API
+    if (mode === "running") {
+      let cancelled = false;
+      const run = async () => {
+        const timer = setInterval(() => {
+          setProgress((prev) => (prev < 90 ? prev + 1 : prev));
+        }, 100);
+
+        const conditionMap: Record<string, string> = {
+          flat: "목적: 평지 위주 러닝",
+          balanced: "목적: 복합 지형(밸런스) 러닝",
+          uphill: "목적: 언덕/업힐 도전 러닝",
+        };
+        const condition = (params.condition as string) || "flat";
+        const safetyMode = (params.safetyMode as string) || "false";
+        const basePrompt = conditionMap[condition];
+        const safetyPrompt = safetyMode === "true" ? " (안전 우선)" : "";
+
+        try {
+          const lat = parseFloat((params.startLat as string) || "37.5005");
+          const lng = parseFloat((params.startLng as string) || "127.0365");
+
+          const response = await routeApi.recommendRoute({
+            lat,
+            lng,
+            prompt: `${basePrompt}${safetyPrompt}`,
+          });
+
+          if (cancelled) return;
+          if (!response?.candidates) {
+            throw new Error("경로 데이터를 받아오지 못했습니다.");
+          }
+
+          clearInterval(timer);
+          setProgress(100);
+
+          router.replace({
+            pathname: "/(screens)/route-preview",
+            params: {
+              candidates: JSON.stringify(response.candidates),
+              mode: "recommend",
+            },
+          });
+        } catch (err) {
+          clearInterval(timer);
+          if (!cancelled) {
+            Alert.alert(
+              "오류",
+              "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+            );
+            router.back();
+          }
+        }
+      };
+      run();
+      return () => {
+        cancelled = true;
+      }
+    }
+
+    // 그림 경로: custom / shape -> generate-gps-art 호출
+    if (mode === "custom" || mode === "shape") {
+      let cancelled = false;
+      const run = async () => {
+        try {
+          const targetKm = parseFloat(
+            (params.shapeDistance as string)?.replace("km", "") ||
+            (params.targetDistanceKm as string) ||
+            "5"
+          );
+          const startLat = parseFloat((params.startLat as string) || "37.5");
+          const startLng = parseFloat((params.startLng as string) || "127");
+
+          const body: Parameters<typeof routeApi.generateGpsArt>[0] = {
+            target_distance_km: targetKm,
+            enable_rotation: true,
+          };
+
+          if (mode === "custom" && params.routeId) {
+            body.route_id = params.routeId as string;
+          } else if (mode === "shape" && params.shapeId) {
+            const shapeId = params.shapeId as string;
+            body.shape_id = params.shapeId as string;
+            body.start = { lat: startLat, lng: startLng };
+            if (PRESET_SVG_PATHS[shapeId]) {
+              body.svg_path = PRESET_SVG_PATHS[shapeId];
+            }
+          } else {
+            setError("경로 정보가 없습니다.");
+            return;
+          }
+
+          const result = await routeApi.generateGpsArt(body);
+          if (cancelled) return;
+
+          router.replace({
+            pathname: "/(screens)/route-preview",
+            params: {
+              ...params,
+              routeId: result.route_id,
+              optionIds: result.option_ids.join(","),
+            } as Record<string, string>,
+          });
+        } catch (err) {
+          if (!cancelled) {
+            setError("경로 생성에 실패했습니다.");
+            router.back();
+          }
+        }
+      };
+      run();
+      return () => {
+        cancelled = true;
+      }
+    }
+
+    // walking
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
