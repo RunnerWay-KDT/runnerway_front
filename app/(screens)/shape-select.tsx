@@ -136,9 +136,9 @@ export default function ShapeSelectScreen() {
         name: `커스텀 경로 ${new Date().toLocaleString("ko-KR")}`,
         svg_path: pathData,
         location: {
-          latitude: 37.5665, // TODO: 실제 사용자 위치로 변경
-          longitude: 126.978,
-          address: "서울특별시",
+          latitude: 37.5007, // 역삼역 좌표
+          longitude: 127.0364,
+          address: "서울특별시 강남구 역삼동",
         },
         estimated_distance: distanceKm,
       });

@@ -34,16 +34,35 @@ export default function ProfileEditScreen() {
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleImageSelect = () => {
-    // TODO: expo-image-picker 설치 후 구현
-    Alert.alert(
+    Alert.prompt(
       "프로필 사진 변경",
-      "이미지 선택 기능은 expo-image-picker 설치 후 사용 가능합니다.\n\n설치 명령어:\nnpx expo install expo-image-picker\n\n현재는 이름만 변경 가능합니다.",
-      [{ text: "확인" }],
+      "이미지 URL을 입력하세요 (http:// 또는 https://로 시작)",
+      [
+        {
+          text: "취소",
+          style: "cancel",
+        },
+        {
+          text: "확인",
+          onPress: (text?: string) => {
+            if (
+              text &&
+              (text.startsWith("http://") || text.startsWith("https://"))
+            ) {
+              setAvatar(text);
+              setHasChanges(text !== user?.avatar || name !== user?.name);
+            } else if (text) {
+              Alert.alert(
+                "오류",
+                "올바른 URL을 입력해주세요.\nhttp:// 또는 https://로 시작해야 합니다.",
+              );
+            }
+          },
+        },
+      ],
+      "plain-text",
+      avatar || "",
     );
-
-    // Demo: 임시로 색상만 변경
-    // setAvatar(avatar ? null : "changed");
-    // setHasChanges(true);
   };
 
   const handleNameChange = (text: string) => {
@@ -65,23 +84,7 @@ export default function ProfileEditScreen() {
     setIsLoading(true);
 
     try {
-      // TODO: 실제 API 호출
-      // const response = await fetch('/api/v1/users/me', {
-      //   method: 'PATCH',
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`,
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     name: name.trim(),
-      //     avatar: avatar ? avatarBase64 : null,
-      //   }),
-      // });
-
-      // Mock: 로컬 업데이트
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // AuthContext의 updateProfile 함수 사용
+      // AuthContext의 updateProfile 함수 사용 (실제 API 호출)
       if (updateProfile) {
         await updateProfile({
           name: name.trim(),

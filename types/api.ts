@@ -70,9 +70,20 @@ export interface UpdateProfileRequest {
   avatar_url?: string | null;
 }
 
+export interface UpdateProfileResponse {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  provider: string | null;
+  is_active: boolean;
+  stats: UserStats;
+  updated_at: string;
+}
+
 export interface UserProfileResponse {
   success: boolean;
-  data: UserData;
+  data: UpdateProfileResponse;
   message: string;
 }
 
