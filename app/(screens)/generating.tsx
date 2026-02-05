@@ -32,6 +32,7 @@ export default function GeneratingScreen() {
   // 파라미터 수신
   const searchParams = useLocalSearchParams<{ 
     condition: string; 
+    duration: string;  // 목표 시간!
     safetyMode: string;
     startLat: string; 
     startLng: string; 
@@ -48,25 +49,28 @@ export default function GeneratingScreen() {
           setProgress((prev) => (prev < 90 ? prev + 1 : prev));
         }, 100);
 
-        // 2. 백엔드에 보낼 키워드 구성 (Backend logic handles distance ranges now)
+        // 2. 백엔드에 보낼 키워드 구성
         const conditionMap: Record<string, string> = {
-          "flat": "목적: 평지 위주 러닝",
-          "balanced": "목적: 복합 지형(밸런스) 러닝",
-          "uphill": "목적: 언덕/업힐 도전 러닝"
+          "recovery": "목적: 회복 러닝",
+          "fat-burn": "목적: 지방 연소",
+          "challenge": "목적: 기록 도전"
         };
-        const basePrompt = conditionMap[searchParams.condition || "flat"];
+        const basePrompt = conditionMap[searchParams.condition || "recovery"];
         const safetyPrompt = searchParams.safetyMode === "true" ? " (안전 우선)" : "";
         
         const handleRecommendation = async () => {
             console.log("📍 Generating Route for:", searchParams.startLat, searchParams.startLng);
+            console.log("⏱️ Duration:", searchParams.duration, "minutes");
             
             try {
                 const lat = parseFloat(searchParams.startLat || "37.5005");
                 const lng = parseFloat(searchParams.startLng || "127.0365");
+                const targetTimeMin = parseFloat(searchParams.duration || "30");
 
                 const response = await routeApi.recommendRoute({
                     lat: lat,
                     lng: lng,
+                    target_time_min: targetTimeMin,  // ✅ 목표 시간 전송!
                     prompt: `${basePrompt}${safetyPrompt}`
                 });
 

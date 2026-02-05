@@ -95,6 +95,7 @@ export interface RouteRequest {
   lat: number;
   lng: number;
   target_distance_km?: number;
+  target_time_min?: number;  // 추가!
   prompt?: string;
 }
 

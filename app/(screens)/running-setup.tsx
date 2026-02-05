@@ -94,7 +94,7 @@ export default function RunningSetupScreen() {
             <Slider
               style={styles.slider}
               minimumValue={10}
-              maximumValue={120}
+              maximumValue={60}
               step={5}
               value={duration}
               onValueChange={setDuration}
@@ -104,7 +104,7 @@ export default function RunningSetupScreen() {
             />
             <View style={styles.sliderLabels}>
               <Text style={styles.sliderLabel}>10분</Text>
-              <Text style={styles.sliderLabel}>120분</Text>
+              <Text style={styles.sliderLabel}>60분</Text>
             </View>
           </View>
         </Animated.View>
