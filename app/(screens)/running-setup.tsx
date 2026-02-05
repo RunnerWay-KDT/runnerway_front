@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Battery,
@@ -39,33 +39,26 @@ export default function RunningSetupScreen() {
 
   const conditions: Condition[] = [
     {
-      id: "flat",
-      title: "평지 러닝",
-      description: "경사가 거의 없는 편안한 5km 평지 코스",
+      id: "recovery",
+      title: "회복 러닝",
+      description: "가볍게 몸을 풀어주는 편안한 페이스",
       Icon: Battery,
     },
     {
-      id: "balanced",
-      title: "밸런스 러닝",
-      description: "적절한 오르내림이 있는 5km 복합 코스",
+      id: "fat-burn",
+      title: "지방 연소",
+      description: "적절한 심박수로 지방 연소 극대화",
       Icon: Flame,
     },
     {
-      id: "uphill",
-      title: "언덕 도전",
-      description: "경사도가 높은 5km 업힐 도전 코스",
+      id: "challenge",
+      title: "기록 도전",
+      description: "목표를 향한 강도 높은 러닝",
       Icon: Trophy,
     },
   ];
 
-  // 이전 화면(Location Setup)에서 전달받은 좌표 파라미터
-  const params = useLocalSearchParams<{ startLat: string; startLng: string }>();
-
   const handleGenerate = () => {
-    // 좌표가 없으면 진행하지 않음 (간단한 방어 코드)
-    if (!params.startLat || !params.startLng) return;
-
-    // 생성 화면으로 이동하며 데이터 전달
     router.push({
       pathname: "/(screens)/generating",
       params: {
@@ -73,8 +66,6 @@ export default function RunningSetupScreen() {
         duration: duration.toString(),
         condition,
         safetyMode: safetyMode.toString(),
-        startLat: params.startLat,
-        startLng: params.startLng,
       },
     });
   };
