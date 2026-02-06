@@ -150,9 +150,9 @@ export default function ShapeSelectScreen() {
           `경로가 성공적으로 저장되었습니다!\nID: ${response.data.route_id}`,
         );
 
-        // Navigate to generating screen with custom drawing
+        // Navigate to drawing setup screen with custom drawing
         router.push({
-          pathname: "/(screens)/generating",
+          pathname: "/(screens)/drawing-setup",
           params: {
             mode: "custom",
             shapeName: "커스텀 경로",
@@ -183,9 +183,9 @@ export default function ShapeSelectScreen() {
       const selected = allShapes.find((s) => s.id === selectedShape);
       if (selected) {
         router.push({
-          pathname: "/(screens)/generating",
+          pathname: "/(screens)/drawing-setup",
           params: {
-            mode: "shape",
+            mode: "preset",
             shapeId: selected.id,
             shapeName: selected.name,
             shapeIconName: selected.iconName,

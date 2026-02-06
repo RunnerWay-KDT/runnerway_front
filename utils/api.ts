@@ -22,6 +22,15 @@ const ACCESS_TOKEN_KEY = "runnerway_access_token";
 const REFRESH_TOKEN_KEY = "runnerway_refresh_token";
 
 // ============================================
+// 로그아웃 콜백 (AuthContext에서 설정)
+// ============================================
+let onUnauthorized: (() => void) | null = null;
+
+export const setUnauthorizedCallback = (callback: () => void) => {
+  onUnauthorized = callback;
+};
+
+// ============================================
 // 토큰 관리 함수
 // ============================================
 
@@ -71,10 +80,73 @@ export const tokenManager = {
 
 export class ApiClient {
   private baseURL: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     console.log("🌐 API Base URL:", this.baseURL);
+  }
+
+  /**
+   * 토큰 갱신 처리
+   */
+  private async handleTokenRefresh(): Promise<void> {
+    // 이미 갱신 중이면 대기
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const refreshToken = await tokenManager.getRefreshToken();
+        if (!refreshToken) {
+          throw new Error("리프레시 토큰이 없습니다");
+        }
+
+        console.log("🔄 토큰 갱신 시도...");
+        const response = await fetch(
+          `${this.baseURL}${API_CONFIG.ENDPOINTS.AUTH.REFRESH}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("토큰 갱신 실패");
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data?.tokens) {
+          await tokenManager.setTokens(
+            data.data.tokens.access_token,
+            data.data.tokens.refresh_token,
+          );
+          console.log("✅ 토큰 갱신 성공");
+        } else {
+          throw new Error("토큰 갱신 응답 형식 오류");
+        }
+      } catch (error) {
+        console.error("❌ 토큰 갱신 실패:", error);
+        // 갱신 실패 시 로그아웃 콜백 실행
+        await tokenManager.clearTokens();
+        if (onUnauthorized) {
+          onUnauthorized();
+        }
+        throw error;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   /**
@@ -83,6 +155,7 @@ export class ApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
+    isRetry = false,
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     console.log("📡 API Request:", options.method || "GET", url);
@@ -101,10 +174,11 @@ export class ApiClient {
       });
     }
 
-    // 인증 토큰 추가 (로그인/회원가입 제외)
+    // 인증 토큰 추가 (로그인/회원가입/토큰갱신 제외)
     if (
       !endpoint.includes("/auth/login") &&
-      !endpoint.includes("/auth/signup")
+      !endpoint.includes("/auth/signup") &&
+      !endpoint.includes("/auth/refresh")
     ) {
       const token = await tokenManager.getAccessToken();
       console.log(
@@ -139,11 +213,28 @@ export class ApiClient {
           errorData,
         });
 
-        // 401 에러인 경우 특별 처리
-        if (response.status === 401) {
-          console.error("🚫 인증 실패 - 토큰이 유효하지 않거나 만료되었습니다");
-          // 토큰 삭제 (선택적)
-          // await tokenManager.clearTokens();
+        // 401 에러인 경우 토큰 갱신 시도
+        if (response.status === 401 && !isRetry) {
+          console.error("🚫 인증 실패 - 토큰 갱신 시도");
+
+          try {
+            // 토큰 갱신 시도
+            await this.handleTokenRefresh();
+
+            // 토큰 갱신 성공 시 원래 요청 재시도
+            console.log("🔄 원래 요청 재시도 중...");
+            return this.request<T>(endpoint, options, true);
+          } catch {
+            console.error("❌ 토큰 갱신 실패 - 로그아웃 처리");
+            // 토큰 갱신 실패 시 로그아웃 (handleTokenRefresh 내부에서 처리됨)
+          }
+        } else if (response.status === 401 && isRetry) {
+          // 재시도에서도 401 에러면 완전히 실패
+          console.error("❌ 토큰 갱신 후에도 인증 실패 - 로그아웃 처리");
+          await tokenManager.clearTokens();
+          if (onUnauthorized) {
+            onUnauthorized();
+          }
         }
 
         throw new Error(

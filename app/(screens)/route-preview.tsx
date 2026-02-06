@@ -33,7 +33,6 @@ interface RouteOption {
   safety: number;
   elevation: number;
   lighting: number;
-  sidewalk: number;
   convenience: number;
   difficulty: string;
   tag: string | null;
@@ -90,7 +89,6 @@ export default function RoutePreviewScreen() {
         safety: 95,
         elevation: 10,
         lighting: 92,
-        sidewalk: 96,
         convenience: 5,
         difficulty: "쉬움",
         tag: fromSaved ? null : "추천"
@@ -106,7 +104,6 @@ export default function RoutePreviewScreen() {
         safety: 88,
         elevation: 12,
         lighting: 87,
-        sidewalk: 92,
         convenience: 3,
         difficulty: "보통",
         tag: fromSaved ? null : "BEST"
@@ -122,7 +119,6 @@ export default function RoutePreviewScreen() {
         safety: 84,
         elevation: 18,
         lighting: 80,
-        sidewalk: 85,
         convenience: 2,
         difficulty: "도전",
         tag: null,
@@ -395,17 +391,6 @@ export default function RoutePreviewScreen() {
                 />
                 <Text style={styles.featureText}>
                   가로등 밝음 ({selectedRoute.lighting}% 조명)
-                </Text>
-              </View>
-              <View style={styles.featureItem}>
-                <View
-                  style={[
-                    styles.featureDot,
-                    { backgroundColor: Colors.purple[400] },
-                  ]}
-                />
-                <Text style={styles.featureText}>
-                  인도 완비 구간 {selectedRoute.sidewalk}%
                 </Text>
               </View>
             </View>
