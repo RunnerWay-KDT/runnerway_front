@@ -383,23 +383,13 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       {/* Background Map */}
-<<<<<<< HEAD
       <LiveKakaoMap 
       routePath={iconName} 
       progress={progress}
       polyline={workoutPolyline.length > 0 ? workoutPolyline : undefined}
       center={mapCenter} 
-=======
-      <LiveKakaoMap
-        routePath={iconName}
-        progress={progress}
-        currentPosition={currentLocation || undefined}
-        polyline={plannedRoute.length > 0 ? plannedRoute : undefined}
-        actualPath={actualRoute.length > 0 ? actualRoute : undefined}
-        center={
-          currentLocation || plannedRoute[0] || { lat: 37.5007, lng: 127.0364 }
-        }
->>>>>>> origin/master
+      currentPosition={currentLocation || undefined}
+      actualPath={actualRoute.length > 0 ? actualRoute : undefined}
       />
 
       {/* Top Controls */}
