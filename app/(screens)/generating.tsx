@@ -96,7 +96,7 @@ export default function GeneratingScreen() {
       }
     }
 
-    // 그림 경로: custom / shape -> generate-gps-art 호출
+    // 그림 경로: custom / shape -> 비동기 생성(시작 후 폴링, 타임아웃 방지)
     if (mode === "custom" || mode === "shape") {
       let cancelled = false;
       const run = async () => {
@@ -109,7 +109,7 @@ export default function GeneratingScreen() {
           const startLat = parseFloat((params.startLat as string) || "37.5");
           const startLng = parseFloat((params.startLng as string) || "127");
 
-          const body: Parameters<typeof routeApi.generateGpsArt>[0] = {
+          const body: Parameters<typeof routeApi.startGpsArtGeneration>[0] = {
             target_distance_km: targetKm,
             enable_rotation: true,
           };
@@ -128,19 +128,45 @@ export default function GeneratingScreen() {
             return;
           }
 
-          const result = await routeApi.generateGpsArt(body);
+          const startRes = await routeApi.startGpsArtGeneration(body);
           if (cancelled) return;
+          const taskId = startRes?.data?.task_id;
+          if (!taskId) {
+            setError("작업을 시작하지 못했습니다.");
+            return;
+          }
 
-          router.replace({
-            pathname: "/(screens)/route-preview",
-            params: {
-              ...params,
-              routeId: result.route_id,
-              optionIds: result.option_ids.join(","),
-            } as Record<string, string>,
-          });
+          const pollIntervalMs = 2500;
+          const poll = async (): Promise<void> => {
+            if (cancelled) return;
+            const statusRes = await routeApi.getRouteGenerationStatus(taskId);
+            console.log('statusRes:', statusRes);
+            if (cancelled) return;
+            if (statusRes.status === "completed" && statusRes.route_id) {
+              const optionIds = Array.isArray(statusRes.option_ids)
+                ? statusRes.option_ids.join(",")
+                : "";
+              router.replace({
+                pathname: "/(screens)/route-preview",
+                params: {
+                  ...params,
+                  routeId: statusRes.route_id,
+                  optionIds,
+                } as Record<string, string>,
+              });
+              return;
+            }
+            if (statusRes.status === "failed") {
+              setError(statusRes.error || "경로 생성에 실패했습니다.");
+              router.back();
+              return;
+            }
+            setTimeout(poll, pollIntervalMs);
+          };
+          setTimeout(poll, pollIntervalMs);
         } catch (err) {
           if (!cancelled) {
+            console.log("generateGpsArt error", err);
             setError("경로 생성에 실패했습니다.");
             router.back();
           }
@@ -153,30 +179,32 @@ export default function GeneratingScreen() {
     }
 
     // walking
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          setTimeout(() => {
-            router.replace({
-              pathname: "/(screens)/route-preview",
-              params: params,
-            });
-          }, 500);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 60);
+    if (mode === "walking") {
+      const progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+              router.replace({
+                pathname: "/(screens)/route-preview",
+                params: params,
+              });
+            }, 500);
+            return 100;
+          }
+          return prev + 2;
+        });
+      }, 60);
 
-    const stepInterval = setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % steps.length);
-    }, 2000);
+      const stepInterval = setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % steps.length);
+      }, 2000);
 
-    return () => {
-      clearInterval(progressInterval);
-      clearInterval(stepInterval);
-    };
+      return () => {
+        clearInterval(progressInterval);
+        clearInterval(stepInterval);
+      };
+    }
   }, [params, router, steps.length]);
 
   const animatedStyle = useAnimatedStyle(() => ({

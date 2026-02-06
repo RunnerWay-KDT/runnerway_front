@@ -41,6 +41,8 @@ export const API_CONFIG = {
     ROUTES: {
       CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
       GENERATE_GPS_ART: "/api/v1/routes/generate-gps-art",
+      GENERATE_GPS_ART_ASYNC: "/api/v1/routes/generate-gps-art-async",
+      GENERATE_STATUS: "/api/v1/routes/generate",
       RECOMMEND: "/api/v1/routes/recommend",
       PREFETCH_ELEVATION: "/api/v1/routes/prefetch-elevation",
     },

@@ -8,12 +8,14 @@ interface LocationPickerMapProps {
   onLocationSelected?: (location: { lat: number; lng: number }) => void;
   initialLocation?: { lat: number; lng: number };
   style?: object;
+  polyline?: { lat: number; lng: number }[];
 }
 
 export default function LocationPickerMap({
   onLocationSelected,
   initialLocation,
   style,
+  polyline,
 }: LocationPickerMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
