@@ -10,13 +10,20 @@ export default function ScreensLayout() {
         animation: "slide_from_right",
       }}
     >
+      <Stack.Screen name="location-setup" />
       <Stack.Screen name="running-setup" />
       <Stack.Screen name="walking-setup" />
+      <Stack.Screen name="route-select" />
       <Stack.Screen name="shape-select" />
+      <Stack.Screen name="drawing-setup" />
       <Stack.Screen name="generating" />
       <Stack.Screen name="route-preview" />
       <Stack.Screen name="workout" />
       <Stack.Screen name="result" />
+      <Stack.Screen name="profile-edit" />
+      <Stack.Screen name="safety-settings" />
+      <Stack.Screen name="saved-routes" />
+      <Stack.Screen name="workout-history" />
     </Stack>
   );
 }
