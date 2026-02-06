@@ -2,8 +2,16 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Battery, Flame, Trophy, Moon, Shield } from "lucide-react-native";
+import {
+  Battery,
+  Flame,
+  Trophy,
+  Moon,
+  Shield,
+  Clock,
+} from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
+import Slider from "@react-native-community/slider";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { OptionCard } from "../../components/OptionCard";
@@ -25,6 +33,7 @@ interface Condition {
 
 export default function RunningSetupScreen() {
   const router = useRouter();
+  const [duration, setDuration] = useState(30);
   const [condition, setCondition] = useState("recovery");
   const [safetyMode, setSafetyMode] = useState(true);
 
@@ -54,6 +63,7 @@ export default function RunningSetupScreen() {
       pathname: "/(screens)/generating",
       params: {
         mode: "running",
+        duration: duration.toString(),
         condition,
         safetyMode: safetyMode.toString(),
       },
@@ -72,7 +82,35 @@ export default function RunningSetupScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInUp.duration(400)}>
+        {/* 목표 시간 */}
+        <Animated.View entering={FadeInUp.duration(400)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Clock size={20} color={Colors.emerald[400]} />
+            <Text style={styles.sectionTitle}>목표 시간</Text>
+          </View>
+          <View style={styles.timeCard}>
+            <Text style={styles.timeValue}>{duration}</Text>
+            <Text style={styles.timeUnit}>분</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={10}
+              maximumValue={120}
+              step={5}
+              value={duration}
+              onValueChange={setDuration}
+              minimumTrackTintColor={Colors.emerald[500]}
+              maximumTrackTintColor={Colors.zinc[700]}
+              thumbTintColor={Colors.emerald[400]}
+            />
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabel}>10분</Text>
+              <Text style={styles.sliderLabel}>120분</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* 컨디션 선택 */}
+        <Animated.View entering={FadeInUp.delay(100).duration(400)}>
           <Text style={styles.sectionTitle}>컨디션 선택</Text>
           <View style={styles.conditionList}>
             {conditions.map((c, index) => (
@@ -131,11 +169,51 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: 120,
   },
+  section: {
+    marginBottom: Spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
   sectionTitle: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
     marginBottom: Spacing.md,
+  },
+  timeCard: {
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius["2xl"],
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  timeValue: {
+    fontSize: 64,
+    fontWeight: FontWeight.bold,
+    color: Colors.emerald[400],
+    lineHeight: 64,
+  },
+  timeUnit: {
+    fontSize: FontSize.xl,
+    color: Colors.zinc[400],
+    marginBottom: Spacing.lg,
+  },
+  slider: {
+    width: "100%",
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: Spacing.xs,
+  },
+  sliderLabel: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[500],
   },
   conditionList: {
     gap: Spacing.sm,

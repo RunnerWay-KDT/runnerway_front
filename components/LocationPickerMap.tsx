@@ -20,7 +20,7 @@ export default function LocationPickerMap({
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentLocation, setCurrentLocation] = useState(
-    initialLocation || { lat: 37.5665, lng: 126.978 },
+    initialLocation || { lat: 37.5007, lng: 127.0364 },
   );
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(true);
