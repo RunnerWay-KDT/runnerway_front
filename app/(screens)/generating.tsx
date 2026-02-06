@@ -44,12 +44,7 @@ export default function GeneratingScreen() {
 
     // [핵심 로직] 경로 생성 실행
     const generateRoute = async () => {
-        // 1. 진행률 시뮬레이션 (API 응답 대기 시간 동안 보여줄 UI)
-        const timer = setInterval(() => {
-          setProgress((prev) => (prev < 90 ? prev + 1 : prev));
-        }, 100);
-
-        // 2. 백엔드에 보낼 키워드 구성
+        // 1. 백엔드에 보낼 키워드 구성
         const conditionMap: Record<string, string> = {
           "recovery": "목적: 회복 러닝",
           "fat-burn": "목적: 지방 연소",
@@ -67,27 +62,82 @@ export default function GeneratingScreen() {
                 const lng = parseFloat(searchParams.startLng || "127.0365");
                 const targetTimeMin = parseFloat(searchParams.duration || "30");
 
-                const response = await routeApi.recommendRoute({
+                // 2. 비동기 경로 생성 시작 (task_id 받기)
+                console.log("🚀 Starting async route generation...");
+                const initResponse = await routeApi.recommendRouteAsync({
                     lat: lat,
                     lng: lng,
-                    target_time_min: targetTimeMin,  // ✅ 목표 시간 전송!
+                    target_time_min: targetTimeMin,
                     prompt: `${basePrompt}${safetyPrompt}`
                 });
 
-                if (!response || !response.candidates) {
-                    throw new Error("경로 데이터를 받아오지 못했습니다.");
+                if (!initResponse || !initResponse.task_id) {
+                    throw new Error("Task 생성에 실패했습니다.");
                 }
 
-                // 90% -> 100%
-                setProgress(100);
-                
-                router.replace({
-                    pathname: "/(screens)/route-preview",
-                    params: {
-                        candidates: JSON.stringify(response.candidates), // 후보 경로 리스트 전달
-                        mode: "recommend"
+                const taskId = initResponse.task_id;
+                console.log("✅ Task created:", taskId);
+
+                // 3. 폴링 - 1초마다 진행률 확인
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const status = await routeApi.getTaskStatus(taskId);
+                        
+                        // 진행률 업데이트 (백엔드에서 받은 실제 값)
+                        setProgress(status.progress);
+                        
+                        // 단계 메시지 업데이트
+                        if (status.current_step) {
+                            // 백엔드 메시지에 따라 화면 단계 변경
+                            if (status.current_step.includes("도로") || status.current_step.includes("시작")) {
+                                setCurrentStep(0);
+                            } else if (status.current_step.includes("고도") || status.current_step.includes("계산")) {
+                                setCurrentStep(1);
+                            } else if (status.current_step.includes("검증") || status.current_step.includes("선택") || status.current_step.includes("저장")) {
+                                setCurrentStep(2);
+                            }
+                        }
+                        
+                        console.log(`📊 Task ${taskId}: ${status.progress}% - ${status.current_step}`);
+                        
+                        // 4. 완료되면 결과 가져오기
+                        if (status.status === "completed") {
+                            clearInterval(pollInterval);
+                            console.log("✅ Task completed! Fetching result...");
+                            
+                            const result = await routeApi.getTaskResult(taskId);
+                            
+                            if (!result || !result.candidates) {
+                                throw new Error("경로 데이터를 받아오지 못했습니다.");
+                            }
+                            
+                            setProgress(100);
+                            console.log("🎉 Route generation successful!");
+                            
+                            router.replace({
+                                pathname: "/(screens)/route-preview",
+                                params: {
+                                    candidates: JSON.stringify(result.candidates),
+                                    mode: "recommend"
+                                }
+                            });
+                        } else if (status.status === "failed") {
+                            clearInterval(pollInterval);
+                            throw new Error(status.error_message || "경로 생성에 실패했습니다.");
+                        }
+                    } catch (pollError) {
+                        console.error("Polling error:", pollError);
+                        // 폴링 에러는 무시하고 계속 시도
                     }
-                });
+                }, 1000); // 1초마다 확인
+
+                // 타임아웃 설정 (60초)
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    Alert.alert("시간 초과", "경로 생성 시간이 너무 오래 걸립니다. 다시 시도해주세요.");
+                    router.back();
+                }, 60000);
+
             } catch (error) {
                 console.error("Route generation error:", error);
                 Alert.alert("오류", "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
@@ -95,9 +145,8 @@ export default function GeneratingScreen() {
             }
         };
 
-        // 3. API 호출 및 완료 처리
+        // API 호출
         await handleRecommendation();
-        clearInterval(timer);
     };
 
     generateRoute();

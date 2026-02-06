@@ -385,6 +385,47 @@ export const routeApi = {
       radius: data.radius || 2000,
     });
   },
+
+  /**
+   * 비동기 경로 추천 (Task 생성)
+   */
+  async recommendRouteAsync(data: RouteRequest): Promise<{
+    task_id: string;
+    status: string;
+    message: string;
+  }> {
+    return apiClient.post("/api/v1/routes/recommend-async", data);
+  },
+
+  /**
+   * Task 상태 조회
+   */
+  async getTaskStatus(taskId: string): Promise<{
+    task_id: string;
+    status: "processing" | "completed" | "failed";
+    progress: number;
+    current_step: string;
+    estimated_remaining: number;
+    error_message: string | null;
+  }> {
+    return apiClient.get(`/api/v1/routes/tasks/${taskId}`);
+  },
+
+  /**
+   * Task 결과 조회
+   */
+  async getTaskResult(taskId: string): Promise<{
+    task_id: string;
+    status: string;
+    route_id: string;
+    candidates: any[];
+    stats: {
+      total_candidates: number;
+      filtered_by_intersection: number;
+    };
+  }> {
+    return apiClient.get(`/api/v1/routes/tasks/${taskId}/result`);
+  },
 };
 
 // ============================================
