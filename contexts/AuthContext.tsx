@@ -54,19 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // 토큰 만료 시 자동 로그아웃 처리
-  const handleUnauthorized = async () => {
-    console.log("🔐 토큰 만료 감지 - 자동 로그아웃 수행");
-    setUser(null);
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      await tokenManager.clearTokens();
-    } catch (error) {
-      console.error("Failed to clear user data:", error);
-    }
-  };
-
-  // API 클라이언트에 콜백 등록
   useEffect(() => {
+    const handleUnauthorized = async () => {
+      console.log("🔐 토큰 만료 감지 - 자동 로그아웃 수행");
+      setUser(null);
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        await tokenManager.clearTokens();
+      } catch (error) {
+        console.error("Failed to clear user data:", error);
+      }
+    };
+
+    // API 클라이언트에 콜백 등록
     setUnauthorizedCallback(handleUnauthorized);
   }, []);
 
