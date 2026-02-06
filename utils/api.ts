@@ -20,6 +20,15 @@ const ACCESS_TOKEN_KEY = "runnerway_access_token";
 const REFRESH_TOKEN_KEY = "runnerway_refresh_token";
 
 // ============================================
+// 로그아웃 콜백 (AuthContext에서 설정)
+// ============================================
+let onUnauthorized: (() => void) | null = null;
+
+export const setUnauthorizedCallback = (callback: () => void) => {
+  onUnauthorized = callback;
+};
+
+// ============================================
 // 토큰 관리 함수
 // ============================================
 
@@ -140,8 +149,13 @@ export class ApiClient {
         // 401 에러인 경우 특별 처리
         if (response.status === 401) {
           console.error("🚫 인증 실패 - 토큰이 유효하지 않거나 만료되었습니다");
-          // 토큰 삭제 (선택적)
-          // await tokenManager.clearTokens();
+          // 토큰 삭제
+          await tokenManager.clearTokens();
+          // 로그아웃 콜백 실행
+          if (onUnauthorized) {
+            console.log("🔄 자동 로그아웃 처리 중...");
+            onUnauthorized();
+          }
         }
 
         throw new Error(
