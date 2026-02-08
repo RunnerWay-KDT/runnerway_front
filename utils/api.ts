@@ -11,6 +11,8 @@ import type {
   UserProfileResponse,
   UpdateProfileRequest,
   ApiResponse,
+  RouteRequest,
+  RecommendRouteResponse,
 } from "../types/api";
 
 // ============================================
@@ -450,6 +452,102 @@ export const routeApi = {
   > {
     return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.CUSTOM_DRAWING, data);
   },
+
+  async generateGpsArt(body: {
+    route_id?: string;
+    shape_id?: string;
+    svg_path?: string; // 프리셋인데 DB에 없을 때 전달, 백엔드가 svg_path에 저장
+    start?: { lat: number; lng: number };
+    target_distance_km: number;
+    name?: string;
+    enable_rotation?: boolean;
+    rotation_angles?: number[] | null;
+  }): Promise<{
+    routes: Array<{
+      id: number;
+      angle: number;
+      distance_km: number;
+      coordinates: Array<{ lat: number; lng: number }>;
+      similarity_score: number;
+    }>;
+    route_id: string;
+    option_ids: string[];
+    scaled_drawing?: unknown;
+    best_angle?: number;
+    validation?: unknown;
+  }> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.GENERATE_GPS_ART, body);
+  },
+
+  /** GPS 아트 비동기 생성 시작 (타임아웃 없음). 완료는 getRouteGenerationStatus 폴링으로 확인 */
+  async startGpsArtGeneration(body: {
+    route_id?: string;
+    shape_id?: string;
+    svg_path?: string;
+    start?: { lat: number; lng: number };
+    target_distance_km: number;
+    name?: string;
+    enable_rotation?: boolean;
+    rotation_angles?: number[] | null;
+  }): Promise<{ success: boolean; data: { task_id: string } }> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.GENERATE_GPS_ART_ASYNC, body);
+  },
+
+  /** 경로 생성 상태 조회 (completed 시 route_id, option_ids 포함) */
+  async getRouteGenerationStatus(taskId: string): Promise<{
+    task_id: string;
+    status: "pending" | "processing" | "completed" | "failed";
+    route_id?: string;
+    option_ids?: string[];
+    progress?: number;
+    current_step?: string;
+    estimated_remaining?: number;
+    error?: string;
+  }> {
+    const response = await apiClient.get<{
+      success: boolean;
+      data: {
+        task_id: string;
+        status: "pending" | "processing" | "completed" | "failed";
+        route_id?: string;
+        option_ids?: string[];
+        progress?: number;
+        current_step?: string;
+        estimated_remaining?: number;
+        error?: string;
+      };
+    }>(`${API_CONFIG.ENDPOINTS.ROUTES.GENERATE_STATUS}/${taskId}`);
+    return response.data;
+  },
+
+  async getRouteOptions(routeId: string) {
+    return apiClient.get(`/api/v1/routes/${routeId}/options`);
+  },
+
+  /**
+   * 경로 추천 요청 (GPT + OSMNX)
+   */
+  async recommendRoute(data: RouteRequest): Promise<RecommendRouteResponse> {
+    return apiClient.post<RecommendRouteResponse>(
+      API_CONFIG.ENDPOINTS.ROUTES.RECOMMEND,
+      data,
+    );
+  },
+
+  /**
+   * 고도 데이터 프리페칭 요청 (백그라운드 수집 시작)
+   */
+  async prefetchElevation(data: {
+    lat: number;
+    lng: number;
+    radius?: number;
+  }): Promise<ApiResponse> {
+    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.PREFETCH_ELEVATION, {
+      ...data,
+      radius: data.radius ?? 2000,
+    });
+  },
+
 };
 
 // ============================================

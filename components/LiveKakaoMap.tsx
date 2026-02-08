@@ -17,6 +17,7 @@ import { KAKAO_MAP_CONFIG } from "../constants/config";
 import { Colors } from "../constants/theme";
 
 interface LiveKakaoMapProps {
+  // 프리셋/커스텀 공통: DB 저장 형식의 svg_path (예: "M 30 60 L 35 45 ...")
   routePath?: string;
   customDrawing?: string | null;
   progress?: number;
@@ -29,6 +30,7 @@ interface LiveKakaoMapProps {
     lng: number;
     heading?: number;
   };
+  // 백엔드에서 변환한 위경도 폴리라인
   polyline?: {
     lat: number;
     lng: number;
@@ -40,7 +42,7 @@ interface LiveKakaoMapProps {
 }
 
 export function LiveKakaoMap({
-  routePath = "heart",
+  routePath,
   customDrawing = null,
   progress = 0,
   center = { lat: 37.5007, lng: 127.0364 },
@@ -53,65 +55,11 @@ export function LiveKakaoMap({
   const [hasError, setHasError] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // 경로에 따른 샘플 폴리라인 데이터 생성
-  const getRoutePolyline = (shape: string) => {
-    const centerLat = center.lat;
-    const centerLng = center.lng;
-    const size = 0.01;
-
-    switch (shape) {
-      case "heart":
-        return [
-          { lat: centerLat, lng: centerLng },
-          { lat: centerLat + size * 0.5, lng: centerLng - size * 0.3 },
-          { lat: centerLat + size * 0.8, lng: centerLng - size * 0.5 },
-          { lat: centerLat + size * 0.3, lng: centerLng },
-          { lat: centerLat + size * 0.8, lng: centerLng + size * 0.5 },
-          { lat: centerLat + size * 0.5, lng: centerLng + size * 0.3 },
-          { lat: centerLat, lng: centerLng },
-        ];
-      case "star":
-        const points = 5;
-        const outerRadius = size * 0.8;
-        const innerRadius = size * 0.4;
-        const starPoints = [];
-        for (let i = 0; i < points * 2; i++) {
-          const radius = i % 2 === 0 ? outerRadius : innerRadius;
-          const angle = (i * Math.PI) / points - Math.PI / 2;
-          starPoints.push({
-            lat: centerLat + radius * Math.sin(angle),
-            lng: centerLng + radius * Math.cos(angle),
-          });
-        }
-        starPoints.push(starPoints[0]);
-        return starPoints;
-      case "circle":
-        const circlePoints = [];
-        for (let i = 0; i <= 32; i++) {
-          const angle = (i * 2 * Math.PI) / 32;
-          circlePoints.push({
-            lat: centerLat + size * 0.7 * Math.sin(angle),
-            lng: centerLng + size * 0.7 * Math.cos(angle),
-          });
-        }
-        return circlePoints;
-      default:
-        return [
-          { lat: centerLat, lng: centerLng },
-          { lat: centerLat + size, lng: centerLng + size },
-        ];
-    }
-  };
-
-  const routePolyline =
-    polyline.length > 0 ? polyline : getRoutePolyline(routePath);
+  const routePolyline = polyline ?? [];
 
   // 진행률에 따른 현재 위치 계산 - useCallback으로 메모이제이션
   const calculateCurrentPosition = useCallback(() => {
     if (currentPosition) return currentPosition;
-
-    if (routePolyline.length < 2)
-      return routePolyline[0] || { lat: center.lat, lng: center.lng };
 
     const totalPoints = routePolyline.length - 1;
     const currentIndex = Math.floor(progress * totalPoints);
