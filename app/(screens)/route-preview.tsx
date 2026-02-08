@@ -120,7 +120,7 @@ export default function RoutePreviewScreen() {
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionsError, setOptionsError] = useState<string | null>(null);
 
-  const routeOptions = generateRouteOptions();
+  const routeOptions = fetchedOptions ?? fallbackOptions;
   const [selectedRoute, setSelectedRoute] = useState(routeOptions[1]);
 
   const routeId = params.routeId as string | undefined;

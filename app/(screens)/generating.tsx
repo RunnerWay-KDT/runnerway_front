@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
@@ -22,8 +22,15 @@ export default function GeneratingScreen() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-
+  const [estimatedRemainingSec, setEstimatedRemainingSec] = useState<number | null>(null);
+  const startedRef = useRef(false);
+  const cancelledRef = useRef(false);
   const rotation = useSharedValue(0);
+
+  // 로더 회전: 마운트 시 한 번만 시작, 완료될 때까지 계속
+  useEffect(() => {
+    rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
+  }, []);
 
   const steps = [
     { Icon: Route, text: "경로 패턴 분석 중", color: Colors.blue[400] },
@@ -32,13 +39,11 @@ export default function GeneratingScreen() {
   ];
 
   useEffect(() => {
-    rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
-
+    cancelledRef.current = false;
     const mode = params.mode as string | undefined;
 
     // running: recommendRoute API
     if (mode === "running") {
-      let cancelled = false;
       const run = async () => {
         const timer = setInterval(() => {
           setProgress((prev) => (prev < 90 ? prev + 1 : prev));
@@ -64,7 +69,7 @@ export default function GeneratingScreen() {
             prompt: `${basePrompt}${safetyPrompt}`,
           });
 
-          if (cancelled) return;
+          if (cancelledRef.current) return;
           if (!response?.candidates) {
             throw new Error("경로 데이터를 받아오지 못했습니다.");
           }
@@ -81,7 +86,7 @@ export default function GeneratingScreen() {
           });
         } catch (err) {
           clearInterval(timer);
-          if (!cancelled) {
+          if (!cancelledRef.current) {
             Alert.alert(
               "오류",
               "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -92,13 +97,15 @@ export default function GeneratingScreen() {
       };
       run();
       return () => {
-        cancelled = true;
+        cancelledRef.current = true;
       }
     }
 
     // 그림 경로: custom / shape -> 비동기 생성(시작 후 폴링, 타임아웃 방지)
     if (mode === "custom" || mode === "shape") {
-      let cancelled = false;
+      if (startedRef.current) return;
+      startedRef.current = true;
+
       const run = async () => {
         try {
           const targetKm = parseFloat(
@@ -129,7 +136,7 @@ export default function GeneratingScreen() {
           }
 
           const startRes = await routeApi.startGpsArtGeneration(body);
-          if (cancelled) return;
+          if (cancelledRef.current) return;
           const taskId = startRes?.data?.task_id;
           if (!taskId) {
             setError("작업을 시작하지 못했습니다.");
@@ -138,10 +145,23 @@ export default function GeneratingScreen() {
 
           const pollIntervalMs = 2500;
           const poll = async (): Promise<void> => {
-            if (cancelled) return;
+            if (cancelledRef.current) return;
             const statusRes = await routeApi.getRouteGenerationStatus(taskId);
-            console.log('statusRes:', statusRes);
-            if (cancelled) return;
+            console.log('progress:', statusRes.progress, typeof statusRes.progress);
+            if (cancelledRef.current) return;
+
+            // API progress / estimated_remaining / current_step 반영
+            if (typeof statusRes.progress === "number") {
+              setProgress(statusRes.progress);
+            }
+            if (typeof statusRes.estimated_remaining === "number") {
+              setEstimatedRemainingSec(statusRes.estimated_remaining)
+            }
+            if (statusRes.current_step != null) {
+              const idx = steps.findIndex((s) => s.text.includes(statusRes.current_step ?? ""));
+              if (idx > 0) setCurrentStep(idx);
+            }
+
             if (statusRes.status === "completed" && statusRes.route_id) {
               const optionIds = Array.isArray(statusRes.option_ids)
                 ? statusRes.option_ids.join(",")
@@ -165,7 +185,7 @@ export default function GeneratingScreen() {
           };
           setTimeout(poll, pollIntervalMs);
         } catch (err) {
-          if (!cancelled) {
+          if (!cancelledRef.current) {
             console.log("generateGpsArt error", err);
             setError("경로 생성에 실패했습니다.");
             router.back();
@@ -174,7 +194,7 @@ export default function GeneratingScreen() {
       };
       run();
       return () => {
-        cancelled = true;
+        cancelledRef.current = true;
       }
     }
 
@@ -232,7 +252,9 @@ export default function GeneratingScreen() {
           <View style={styles.progressLabels}>
             <Text style={styles.progressText}>{progress}%</Text>
             <Text style={styles.progressText}>
-              완료까지 약 {Math.ceil((100 - progress) / 20)}초
+              {estimatedRemainingSec 
+              ? `완료까지 약 ${estimatedRemainingSec}초` 
+              : `완료까지 약 ${Math.ceil((100 - progress) / 20)}초`}
             </Text>
           </View>
         </View>

@@ -517,7 +517,6 @@ export const routeApi = {
         error?: string;
       };
     }>(`${API_CONFIG.ENDPOINTS.ROUTES.GENERATE_STATUS}/${taskId}`);
-    console.log('status response:', response);
     return response.data;
   },
 
