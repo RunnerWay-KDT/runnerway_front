@@ -44,6 +44,9 @@ export default function GeneratingScreen() {
 
     // running: recommendRoute API
     if (mode === "running") {
+      if (startedRef.current) return;
+      startedRef.current = true;
+      
       const run = async () => {
         const timer = setInterval(() => {
           setProgress((prev) => (prev < 90 ? prev + 1 : prev));

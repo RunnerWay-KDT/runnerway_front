@@ -26,6 +26,7 @@ interface KakaoMapProps {
     lat: number;
     lng: number;
   }[];
+  startPosition?: {lat: number; lng: number;} | null;
 }
 
 export function KakaoMap({
@@ -34,10 +35,13 @@ export function KakaoMap({
   center = { lat: 37.5007, lng: 127.0364 },
   markers = [],
   polyline = [],
+  startPosition = null,
 }: KakaoMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const startLat = startPosition?.lat ?? 0;
+  const startLng = startPosition?.lng ?? 0;
 
   // 경로에 따른 샘플 폴리라인 데이터 생성
   const getRoutePolyline = (shape: string) => {
@@ -219,8 +223,12 @@ export function KakaoMap({
             customMarker.style.cssText = 'width:30px;height:30px;background:#10b981;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;';
             customMarker.innerText = 'S';
 
+            var startMarkerPos = (${startLat !== null} && ${startLng !== null})
+              ? new kakao.maps.LatLng(${startLat}, ${startLng})
+              : linePath[0];
+
             var startOverlay = new kakao.maps.CustomOverlay({
-              position: linePath[0],
+              position: startMarkerPos,
               content: customMarker,
               yAnchor: 0.5
             });
