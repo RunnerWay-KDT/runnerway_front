@@ -88,30 +88,16 @@ export interface UserProfileResponse {
 }
 
 // ============================================
-// 러닝 경로 관련 타입
+// 경로 추천 관련 타입
 // ============================================
 
 export interface RouteRequest {
   lat: number;
   lng: number;
-  target_distance_km?: number;
-  target_time_min?: number;  // 추가!
-  prompt?: string;
-}
-
-export interface RoutePoint {
-  lat: number;
-  lng: number;
-}
-
-export interface RouteCandidate {
-  id: number;
-  name: string;
-  distance: string;
-  time: number;
-  path: RoutePoint[];
+  prompt: string;
 }
 
 export interface RecommendRouteResponse {
-  candidates: RouteCandidate[];
+  candidates?: Array<unknown>;
+  [key: string]: unknown;
 }

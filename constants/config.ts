@@ -41,9 +41,20 @@ export const API_CONFIG = {
     ROUTES: {
       RECOMMEND: "/api/v1/routes/recommend",
       CUSTOM_DRAWING: "/api/v1/routes/custom-drawing",
+      GENERATE_GPS_ART: "/api/v1/routes/generate-gps-art",
+      GENERATE_GPS_ART_ASYNC: "/api/v1/routes/generate-gps-art-async",
+      GENERATE_STATUS: "/api/v1/routes/generate",
+      RECOMMEND: "/api/v1/routes/recommend",
       PREFETCH_ELEVATION: "/api/v1/routes/prefetch-elevation",
     },
   },
+};
+
+// 프리셋 도형 svg_path (DB에 없을 때 API body로 전달)
+export const PRESET_SVG_PATHS: Record<string, string> = {
+  heart: "M 175 260 L 150 230 L 130 210 L 130 190 L 145 175 L 160 175 L 175 190 L 190 175 L 205 175 L 220 190 L 220 210 L 200 230 L 175 260",
+  fish: "M 30 60 L 35 45 L 45 35 L 60 25 L 85 20 L 110 25 L 130 35 L 145 25 L 165 20 L 175 25 L 170 45 L 160 60 L 170 75 L 175 95 L 165 100 L 145 95 L 130 85 L 110 95 L 85 100 L 60 95 L 45 85 L 35 75 L 30 60",
+  sweet_potato: "M 250 80 L 180 60 L 100 70 L 40 120 L 20 180 L 50 240 L 120 270 L 200 260 L 280 220 L 320 160 L 300 100 L 250 80",
 };
 
 // Expo의 환경 변수에서 API 키 가져오기

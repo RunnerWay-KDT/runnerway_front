@@ -77,6 +77,24 @@ export default function WorkoutScreen() {
   const targetDistance = parseFloat((params.targetDistance as string) || "4.2");
   const iconName = (params.shapeIconName as string) || "heart";
 
+  // json 문자열 → 배열 변환
+  const routePolylineParam = params.routePolyline as string | undefined;
+  const workoutPolyline = (() => {
+    if (!routePolylineParam) return [];
+    try {
+      const parsed = JSON.parse(routePolylineParam); // 문자열  -> 배열
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+  const mapCenter = workoutPolyline.length > 0
+    ? {
+      lat: workoutPolyline.reduce((s, p) => s + p.lat, 0) / workoutPolyline.length,
+      lng: workoutPolyline.reduce((s, p) => s + p.lng, 0) / workoutPolyline.length,
+    }
+    : undefined;
+
   const progress = Math.min(distance / targetDistance, 1);
   const progressWidth = useSharedValue(0);
 
@@ -365,15 +383,13 @@ export default function WorkoutScreen() {
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <LiveKakaoMap
-        routePath={iconName}
-        progress={progress}
-        currentPosition={currentLocation || undefined}
-        polyline={plannedRoute.length > 0 ? plannedRoute : undefined}
-        actualPath={actualRoute.length > 0 ? actualRoute : undefined}
-        center={
-          currentLocation || plannedRoute[0] || { lat: 37.5007, lng: 127.0364 }
-        }
+      <LiveKakaoMap 
+      routePath={iconName} 
+      progress={progress}
+      polyline={workoutPolyline.length > 0 ? workoutPolyline : undefined}
+      center={mapCenter} 
+      currentPosition={currentLocation || undefined}
+      actualPath={actualRoute.length > 0 ? actualRoute : undefined}
       />
 
       {/* Top Controls */}

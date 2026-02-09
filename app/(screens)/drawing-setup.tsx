@@ -21,7 +21,7 @@ export default function DrawingSetupScreen() {
   const [duration, setDuration] = useState(30);
 
   // 시속 4km 기준으로 예상 거리 계산
-  const WALKING_SPEED_KM_PER_HOUR = 4;
+  const WALKING_SPEED_KM_PER_HOUR = 5;
   const estimatedDistance = (
     (duration / 60) *
     WALKING_SPEED_KM_PER_HOUR
@@ -39,7 +39,9 @@ export default function DrawingSetupScreen() {
           shapeIconName: params.shapeIconName,
           shapeDistance: params.shapeDistance,
           targetDuration: duration.toString(),
-          targetDistance: estimatedDistance,
+          targetDistanceKm: estimatedDistance,
+          startLat: params.startLat as string | undefined,
+          startLng: params.startLng as string | undefined,
         },
       });
     }
@@ -55,7 +57,9 @@ export default function DrawingSetupScreen() {
           customPath: params.customPath,
           routeId: params.routeId,
           targetDuration: duration.toString(),
-          targetDistance: estimatedDistance,
+          targetDistanceKm: estimatedDistance,
+          startLat: params.startLat as string | undefined,
+          startLng: params.startLng as string | undefined,
         },
       });
     }

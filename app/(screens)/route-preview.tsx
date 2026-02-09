@@ -10,8 +10,14 @@ import {
   Store,
   TrendingUp,
 } from "lucide-react-native";
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { BottomSheet } from "../../components/BottomSheet";
 import { KakaoMap } from "../../components/KakaoMap";
@@ -24,6 +30,7 @@ import {
   Spacing,
 } from "../../constants/theme";
 import { getIconComponent } from "../../utils/shapeIcons";
+import { routeApi } from "@/utils/api";
 
 interface RouteOption {
   id: number;
@@ -36,6 +43,10 @@ interface RouteOption {
   convenience: number;
   difficulty: string;
   tag: string | null;
+  // 경로 옵션 ID 
+  optionId?: string;
+  // 실제 경로 좌표
+  coordinates?: { lat: number; lng: number }[];
 }
 
 export default function RoutePreviewScreen() {
@@ -126,19 +137,101 @@ export default function RoutePreviewScreen() {
     ];
   };
 
+<<<<<<< HEAD
   const routeOptions = generateRouteOptions();
   const [selectedRoute, setSelectedRoute] = useState(routeOptions[0]); 
+=======
+  const fallbackOptions = generateRouteOptions();
+  const [fetchedOptions, setFetchedOptions] = useState<RouteOption[] | null>(null);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+
+  const routeOptions = fetchedOptions ?? fallbackOptions;
+  const [selectedRoute, setSelectedRoute] = useState(routeOptions[1]);
+>>>>>>> master
+
+  const routeId = params.routeId as string | undefined;
+
+  useEffect(() => {
+    if (!routeId) {
+      setSelectedRoute(fallbackOptions[1]);
+      return;
+    }
+    let cancelled = false;
+    setOptionsLoading(true);
+    setOptionsError(null);
+    routeApi
+      .getRouteOptions(routeId)
+      .then((res: unknown) => {
+        const data = (res as { data?: { options?: Array<{
+          id: string;
+          option_number: number;
+          name: string;
+          distance: number;
+          estimated_time: number;
+          difficulty: string;
+          tag: string | null;
+          coordinates: Array<{ lat: number; lng: number}>;
+          scores?: { safety?: number; elevation?: number; }
+        }>}})?.data;
+        if (cancelled) return;
+        const options = data?.options ?? [];
+        if (options.length === 0) {
+          setFetchedOptions(null);
+          setSelectedRoute(fallbackOptions[1]);
+          setOptionsLoading(false);
+          return;
+        }
+        const mapped: RouteOption[] = options.map((opt, idx) => ({
+          id: opt.option_number ?? idx + 1,
+          name: opt.name,
+          distance: `${Number(opt.distance).toFixed(1)}km`,
+          estimatedTime: opt.estimated_time ?? 0,
+          safety: opt.scores?.safety ?? 0,
+          elevation: opt.scores?.elevation ?? 0,
+          lighting: (opt.scores as { lighting?: number })?.lighting ?? 0,
+          sidewalk: (opt.scores as { sidewalk?: number })?.sidewalk ?? 0,
+          convenience: 0,
+          difficulty: opt.difficulty ?? "보통",
+          tag: opt.tag ?? null,
+          optionId: opt.id,
+          coordinates: Array.isArray(opt.coordinates)
+            ? opt.coordinates.map((c) => ({ lat: Number(c.lat), lng: Number(c.lng) }))
+            : undefined,
+        }))
+        setFetchedOptions(mapped);
+        const defaultIndex = 0; // 가장 유사도 높은 top1(1순위)를 미리 선택
+        setSelectedRoute(mapped[defaultIndex]);
+        setOptionsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setOptionsError((err as Error)?.message ?? "경로 옵션을 불러오지 못했습니다.");
+          setFetchedOptions(null);
+          setSelectedRoute(fallbackOptions[1]);
+          setOptionsLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [routeId]);
 
   const RouteIcon = getIconComponent(iconName);
 
+  // workout으로 선택한 경로 좌표 넘기기 (실제 경로 좌표가 있으면 그것을 넘기고, 없으면 프리셋 경로 좌표를 넘김)
   const handleStart = () => {
     router.push({
       pathname: "/(screens)/workout",
       params: {
         ...params,
+        ...(routeId && selectedRoute.optionId
+          ? { routeId, optionId: selectedRoute.optionId }
+          : { }),
         selectedRouteId: selectedRoute.id.toString(),
         targetDistance: parseFloat(selectedRoute.distance).toString(),
         routeName: selectedRoute.name,
+        ...(selectedRoute.coordinates && selectedRoute.coordinates.length > 0
+          ? { routePolyline: JSON.stringify(selectedRoute.coordinates)}
+          : { }),
       },
     });
   };
@@ -146,26 +239,40 @@ export default function RoutePreviewScreen() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "쉬움":
+      case '짧은 코스':
         return { text: Colors.emerald[400], bg: `${Colors.emerald[500]}20` };
       case "보통":
         return { text: Colors.blue[400], bg: `${Colors.blue[500]}20` };
       case "도전":
+      case '긴 코스':
         return { text: Colors.orange[400], bg: `${Colors.orange[500]}20` };
       default:
         return { text: Colors.zinc[400], bg: `${Colors.zinc[500]}20` };
     }
   };
 
-  // 선택된 경로의 path 데이터 (AI 추천인 경우 option에 포함됨)
-  const currentPathData = (selectedRoute as any).path || [];
+  // 실제 경로가 있으면 polyline+center 전달 
+  // → KakaoMap이 setBounds로 전체 경로가 보이게 함
+  const mapPolyline = selectedRoute.coordinates && selectedRoute.coordinates.length > 0
+  ? selectedRoute.coordinates
+  : [];
+  // 경로 전체의 기하학적 중심(무게 중심). 인덱스 중간이 아니라 모든 좌표 평균
+  const mapCenter = (() => {
+    if (mapPolyline.length === 0) return undefined;
+    const sumLat = mapPolyline.reduce((s, p) => s + p.lat, 0);
+    const sumLng = mapPolyline.reduce((s, p) => s + p.lng, 0);
+    const n = mapPolyline.length;
+    return { lat: sumLat / n, lng: sumLng / n };
+  })();
 
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <KakaoMap 
+      <KakaoMap
+        key={mapPolyline.length > 0 ? 'path' : 'preset'} 
         routePath={iconName} 
-        polyline={currentPathData} 
-        center={currentPathData.length > 0 ? { lat: currentPathData[0].lat, lng: currentPathData[0].lng } : undefined}
+        polyline={mapPolyline} 
+        center={mapCenter} 
       />
 
       {/* Header */}

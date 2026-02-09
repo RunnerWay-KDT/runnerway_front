@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Heart,
@@ -45,6 +45,7 @@ interface Shape {
 
 export default function ShapeSelectScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ startLat?: string; startLng?: string }>();
   const [selectedShape, setSelectedShape] = useState("");
   const [activeMainTab, setActiveMainTab] = useState("presets");
   const [activeSubTab, setActiveSubTab] = useState("shapes");
@@ -160,6 +161,8 @@ export default function ShapeSelectScreen() {
             shapeDistance: `${distanceKm.toFixed(1)}km`,
             customPath: pathData,
             routeId: response.data.route_id,
+            startLat: params.startLat,
+            startLng: params.startLng,
           },
         });
       }
@@ -190,6 +193,8 @@ export default function ShapeSelectScreen() {
             shapeName: selected.name,
             shapeIconName: selected.iconName,
             shapeDistance: selected.distance,
+            startLat: params.startLat,
+            startLng: params.startLng,
           },
         });
       }

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Dimensions, Alert } from "react-native";
+=======
+import React, { useEffect, useState, useRef } from "react";
+import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from "react-native";
+>>>>>>> master
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
 import { routeApi } from "../../utils/api";
@@ -12,6 +17,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import { Colors, FontSize, FontWeight, Spacing } from "../../constants/theme";
+import { PRESET_SVG_PATHS } from "../../constants/config";
 
 const { width } = Dimensions.get("window");
 
@@ -20,8 +26,16 @@ export default function GeneratingScreen() {
   const params = useLocalSearchParams();
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-
+  const [error, setError] = useState<string | null>(null);
+  const [estimatedRemainingSec, setEstimatedRemainingSec] = useState<number | null>(null);
+  const startedRef = useRef(false);
+  const cancelledRef = useRef(false);
   const rotation = useSharedValue(0);
+
+  // 로더 회전: 마운트 시 한 번만 시작, 완료될 때까지 계속
+  useEffect(() => {
+    rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
+  }, []);
 
   const steps = [
     { Icon: Route, text: "경로 패턴 분석 중", color: Colors.blue[400] },
@@ -39,118 +53,193 @@ export default function GeneratingScreen() {
   }>();
 
   useEffect(() => {
-    // 로딩 애니메이션 실행
-    rotation.value = withRepeat(withTiming(360, { duration: 2000 }), -1);
+    cancelledRef.current = false;
+    const mode = params.mode as string | undefined;
 
-    // [핵심 로직] 경로 생성 실행
-    const generateRoute = async () => {
-        // 1. 백엔드에 보낼 키워드 구성
+    // running: recommendRoute API
+    if (mode === "running") {
+      const run = async () => {
+        const timer = setInterval(() => {
+          setProgress((prev) => (prev < 90 ? prev + 1 : prev));
+        }, 100);
+
         const conditionMap: Record<string, string> = {
-          "recovery": "목적: 회복 러닝",
-          "fat-burn": "목적: 지방 연소",
-          "challenge": "목적: 기록 도전"
+          flat: "목적: 평지 위주 러닝",
+          balanced: "목적: 복합 지형(밸런스) 러닝",
+          uphill: "목적: 언덕/업힐 도전 러닝",
         };
-        const basePrompt = conditionMap[searchParams.condition || "recovery"];
-        const safetyPrompt = searchParams.safetyMode === "true" ? " (안전 우선)" : "";
-        
-        const handleRecommendation = async () => {
-            console.log("📍 Generating Route for:", searchParams.startLat, searchParams.startLng);
-            console.log("⏱️ Duration:", searchParams.duration, "minutes");
-            
-            try {
-                const lat = parseFloat(searchParams.startLat || "37.5005");
-                const lng = parseFloat(searchParams.startLng || "127.0365");
-                const targetTimeMin = parseFloat(searchParams.duration || "30");
+        const condition = (params.condition as string) || "flat";
+        const safetyMode = (params.safetyMode as string) || "false";
+        const basePrompt = conditionMap[condition];
+        const safetyPrompt = safetyMode === "true" ? " (안전 우선)" : "";
 
-                // 2. 비동기 경로 생성 시작 (task_id 받기)
-                console.log("🚀 Starting async route generation...");
-                const initResponse = await routeApi.recommendRouteAsync({
-                    lat: lat,
-                    lng: lng,
-                    target_time_min: targetTimeMin,
-                    prompt: `${basePrompt}${safetyPrompt}`
-                });
+        try {
+          const lat = parseFloat((params.startLat as string) || "37.5005");
+          const lng = parseFloat((params.startLng as string) || "127.0365");
 
-                if (!initResponse || !initResponse.task_id) {
-                    throw new Error("Task 생성에 실패했습니다.");
-                }
+          const response = await routeApi.recommendRoute({
+            lat,
+            lng,
+            prompt: `${basePrompt}${safetyPrompt}`,
+          });
 
-                const taskId = initResponse.task_id;
-                console.log("✅ Task created:", taskId);
+          if (cancelledRef.current) return;
+          if (!response?.candidates) {
+            throw new Error("경로 데이터를 받아오지 못했습니다.");
+          }
 
-                // 3. 폴링 - 1초마다 진행률 확인
-                const pollInterval = setInterval(async () => {
-                    try {
-                        const status = await routeApi.getTaskStatus(taskId);
-                        
-                        // 진행률 업데이트 (백엔드에서 받은 실제 값)
-                        setProgress(status.progress);
-                        
-                        // 단계 메시지 업데이트
-                        if (status.current_step) {
-                            // 백엔드 메시지에 따라 화면 단계 변경
-                            if (status.current_step.includes("도로") || status.current_step.includes("시작")) {
-                                setCurrentStep(0);
-                            } else if (status.current_step.includes("고도") || status.current_step.includes("계산")) {
-                                setCurrentStep(1);
-                            } else if (status.current_step.includes("검증") || status.current_step.includes("선택") || status.current_step.includes("저장")) {
-                                setCurrentStep(2);
-                            }
-                        }
-                        
-                        console.log(`📊 Task ${taskId}: ${status.progress}% - ${status.current_step}`);
-                        
-                        // 4. 완료되면 결과 가져오기
-                        if (status.status === "completed") {
-                            clearInterval(pollInterval);
-                            console.log("✅ Task completed! Fetching result...");
-                            
-                            const result = await routeApi.getTaskResult(taskId);
-                            
-                            if (!result || !result.candidates) {
-                                throw new Error("경로 데이터를 받아오지 못했습니다.");
-                            }
-                            
-                            setProgress(100);
-                            console.log("🎉 Route generation successful!");
-                            
-                            router.replace({
-                                pathname: "/(screens)/route-preview",
-                                params: {
-                                    candidates: JSON.stringify(result.candidates),
-                                    mode: "recommend"
-                                }
-                            });
-                        } else if (status.status === "failed") {
-                            clearInterval(pollInterval);
-                            throw new Error(status.error_message || "경로 생성에 실패했습니다.");
-                        }
-                    } catch (pollError) {
-                        console.error("Polling error:", pollError);
-                        // 폴링 에러는 무시하고 계속 시도
-                    }
-                }, 1000); // 1초마다 확인
+          clearInterval(timer);
+          setProgress(100);
 
-                // 타임아웃 설정 (60초)
-                setTimeout(() => {
-                    clearInterval(pollInterval);
-                    Alert.alert("시간 초과", "경로 생성 시간이 너무 오래 걸립니다. 다시 시도해주세요.");
-                    router.back();
-                }, 60000);
+          router.replace({
+            pathname: "/(screens)/route-preview",
+            params: {
+              candidates: JSON.stringify(response.candidates),
+              mode: "recommend",
+            },
+          });
+        } catch (err) {
+          clearInterval(timer);
+          if (!cancelledRef.current) {
+            Alert.alert(
+              "오류",
+              "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+            );
+            router.back();
+          }
+        }
+      };
+      run();
+      return () => {
+        cancelledRef.current = true;
+      }
+    }
 
-            } catch (error) {
-                console.error("Route generation error:", error);
-                Alert.alert("오류", "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-                router.back();
+    // 그림 경로: custom / shape -> 비동기 생성(시작 후 폴링, 타임아웃 방지)
+    if (mode === "custom" || mode === "shape") {
+      if (startedRef.current) return;
+      startedRef.current = true;
+
+      const run = async () => {
+        try {
+          const targetKm = parseFloat(
+            (params.shapeDistance as string)?.replace("km", "") ||
+            (params.targetDistanceKm as string) ||
+            "5"
+          );
+          const startLat = parseFloat((params.startLat as string) || "37.5");
+          const startLng = parseFloat((params.startLng as string) || "127");
+
+          const body: Parameters<typeof routeApi.startGpsArtGeneration>[0] = {
+            target_distance_km: targetKm,
+            enable_rotation: true,
+          };
+
+          if (mode === "custom" && params.routeId) {
+            body.route_id = params.routeId as string;
+          } else if (mode === "shape" && params.shapeId) {
+            const shapeId = params.shapeId as string;
+            body.shape_id = params.shapeId as string;
+            body.start = { lat: startLat, lng: startLng };
+            if (PRESET_SVG_PATHS[shapeId]) {
+              body.svg_path = PRESET_SVG_PATHS[shapeId];
             }
-        };
+          } else {
+            setError("경로 정보가 없습니다.");
+            return;
+          }
 
-        // API 호출
-        await handleRecommendation();
-    };
+          const startRes = await routeApi.startGpsArtGeneration(body);
+          if (cancelledRef.current) return;
+          const taskId = startRes?.data?.task_id;
+          if (!taskId) {
+            setError("작업을 시작하지 못했습니다.");
+            return;
+          }
 
-    generateRoute();
-  }, []);
+          const pollIntervalMs = 2500;
+          const poll = async (): Promise<void> => {
+            if (cancelledRef.current) return;
+            const statusRes = await routeApi.getRouteGenerationStatus(taskId);
+            console.log('progress:', statusRes.progress, typeof statusRes.progress);
+            if (cancelledRef.current) return;
+
+            // API progress / estimated_remaining / current_step 반영
+            if (typeof statusRes.progress === "number") {
+              setProgress(statusRes.progress);
+            }
+            if (typeof statusRes.estimated_remaining === "number") {
+              setEstimatedRemainingSec(statusRes.estimated_remaining)
+            }
+            if (statusRes.current_step != null) {
+              const idx = steps.findIndex((s) => s.text.includes(statusRes.current_step ?? ""));
+              if (idx > 0) setCurrentStep(idx);
+            }
+
+            if (statusRes.status === "completed" && statusRes.route_id) {
+              const optionIds = Array.isArray(statusRes.option_ids)
+                ? statusRes.option_ids.join(",")
+                : "";
+              router.replace({
+                pathname: "/(screens)/route-preview",
+                params: {
+                  ...params,
+                  routeId: statusRes.route_id,
+                  optionIds,
+                } as Record<string, string>,
+              });
+              return;
+            }
+            if (statusRes.status === "failed") {
+              setError(statusRes.error || "경로 생성에 실패했습니다.");
+              router.back();
+              return;
+            }
+            setTimeout(poll, pollIntervalMs);
+          };
+          setTimeout(poll, pollIntervalMs);
+        } catch (err) {
+          if (!cancelledRef.current) {
+            console.log("generateGpsArt error", err);
+            setError("경로 생성에 실패했습니다.");
+            router.back();
+          }
+        }
+      };
+      run();
+      return () => {
+        cancelledRef.current = true;
+      }
+    }
+
+    // walking
+    if (mode === "walking") {
+      const progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(progressInterval);
+            setTimeout(() => {
+              router.replace({
+                pathname: "/(screens)/route-preview",
+                params: params,
+              });
+            }, 500);
+            return 100;
+          }
+          return prev + 2;
+        });
+      }, 60);
+
+      const stepInterval = setInterval(() => {
+        setCurrentStep((prev) => (prev + 1) % steps.length);
+      }, 2000);
+
+      return () => {
+        clearInterval(progressInterval);
+        clearInterval(stepInterval);
+      };
+    }
+  }, [params, router, steps.length]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -177,7 +266,9 @@ export default function GeneratingScreen() {
           <View style={styles.progressLabels}>
             <Text style={styles.progressText}>{progress}%</Text>
             <Text style={styles.progressText}>
-              완료까지 약 {Math.ceil((100 - progress) / 20)}초
+              {estimatedRemainingSec 
+              ? `완료까지 약 ${estimatedRemainingSec}초` 
+              : `완료까지 약 ${Math.ceil((100 - progress) / 20)}초`}
             </Text>
           </View>
         </View>
