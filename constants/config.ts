@@ -53,6 +53,13 @@ export const API_CONFIG = {
       RESUME: "/api/v1/workouts", // /{workout_id}/resume
       DETAIL: "/api/v1/workouts", // /{workout_id}
       CURRENT: "/api/v1/workouts/current/status",
+      HISTORY: "/api/v1/users/me/workouts", // 내 운동 기록 목록
+      DELETE_RECORD: "/api/v1/workouts", // /{workout_id}/record
+    },
+    SAVED_ROUTES: {
+      LIST: "/api/v1/users/me/saved-routes", // 저장한 경로 목록
+      SAVE: "/api/v1/routes", // /{route_id}/save  POST
+      UNSAVE: "/api/v1/routes", // /{route_id}/save  DELETE
     },
   },
 };

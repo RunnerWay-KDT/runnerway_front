@@ -17,6 +17,9 @@ import type {
   WorkoutStartResponse,
   WorkoutCompleteRequest,
   WorkoutCompleteResponse,
+  WorkoutListResponse,
+  WorkoutDetailResponse,
+  SavedRouteListResponse,
 } from "../types/api";
 
 // ============================================
@@ -675,6 +678,85 @@ export const workoutApi = {
    */
   async getCurrentWorkout(): Promise<ApiResponse> {
     return apiClient.get<ApiResponse>(API_CONFIG.ENDPOINTS.WORKOUTS.CURRENT);
+  },
+
+  /**
+   * 내 운동 기록 목록 조회 → /api/v1/users/me/workouts
+   */
+  async getWorkoutHistory(params?: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    mode?: string;
+  }): Promise<WorkoutListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", String(params.page));
+    if (params?.limit) queryParams.append("limit", String(params.limit));
+    if (params?.sort) queryParams.append("sort", params.sort);
+    if (params?.mode) queryParams.append("mode", params.mode);
+
+    const queryString = queryParams.toString();
+    const url = `${API_CONFIG.ENDPOINTS.WORKOUTS.HISTORY}${queryString ? `?${queryString}` : ""}`;
+    return apiClient.get<WorkoutListResponse>(url);
+  },
+
+  /**
+   * 운동 상세 조회 → /api/v1/workouts/{workout_id}
+   */
+  async getWorkoutDetail(workoutId: string): Promise<WorkoutDetailResponse> {
+    return apiClient.get<WorkoutDetailResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.DETAIL}/${workoutId}`,
+    );
+  },
+
+  /**
+   * 운동 기록 삭제 → DELETE /api/v1/workouts/{workout_id}/record
+   */
+  async deleteWorkoutRecord(workoutId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.DELETE_RECORD}/${workoutId}/record`,
+    );
+  },
+};
+
+// ============================================
+// 저장 경로(북마크) API
+// ============================================
+export const savedRouteApi = {
+  /**
+   * 저장한 경로 목록 조회 → /api/v1/users/me/saved-routes
+   */
+  async getSavedRoutes(params?: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+  }): Promise<SavedRouteListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", String(params.page));
+    if (params?.limit) queryParams.append("limit", String(params.limit));
+    if (params?.sort) queryParams.append("sort", params.sort);
+
+    const queryString = queryParams.toString();
+    const url = `${API_CONFIG.ENDPOINTS.SAVED_ROUTES.LIST}${queryString ? `?${queryString}` : ""}`;
+    return apiClient.get<SavedRouteListResponse>(url);
+  },
+
+  /**
+   * 경로 저장 (북마크) → POST /api/v1/routes/{route_id}/save
+   */
+  async saveRoute(routeId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.SAVED_ROUTES.SAVE}/${routeId}/save`,
+    );
+  },
+
+  /**
+   * 경로 저장 취소 → DELETE /api/v1/routes/{route_id}/save
+   */
+  async unsaveRoute(routeId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.SAVED_ROUTES.UNSAVE}/${routeId}/save`,
+    );
   },
 };
 

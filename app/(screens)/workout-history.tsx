@@ -1,14 +1,18 @@
 import { useRouter } from "expo-router";
 import {
   ArrowUpDown,
+  Bookmark,
   Calendar,
   Clock,
   Flame,
   MapPin,
+  Trash2,
   TrendingUp,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -16,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -28,15 +33,20 @@ import {
   Spacing,
 } from "../../constants/theme";
 import { getIconComponent } from "../../utils/shapeIcons";
+import { workoutApi, savedRouteApi } from "../../utils/api";
+import type { WorkoutSummary } from "../../types/api";
 
+// 운동 기록을 화면에 맞게 변환한 인터페이스
 interface WorkoutRecord {
   id: string;
+  routeId: string | null;
   routeName: string;
   type: "running" | "walking";
   distance: number;
   duration: number; // seconds
   pace: string;
   calories: number;
+  isBookmarked: boolean;
   routeData: {
     shapeId: string;
     shapeName: string;
@@ -45,96 +55,93 @@ interface WorkoutRecord {
   completedAt: string; // ISO8601
 }
 
-// Mock 데이터
-const MOCK_WORKOUTS: WorkoutRecord[] = [
-  {
-    id: "workout_001",
-    routeName: "하트 경로 B",
-    type: "running",
-    distance: 4.2,
-    duration: 1723, // 28분 43초
-    pace: "6'50\"",
-    calories: 247,
-    routeData: {
-      shapeId: "heart",
-      shapeName: "하트",
-      iconName: "heart",
-    },
-    completedAt: "2026-01-20T18:30:00Z",
-  },
-  {
-    id: "workout_002",
-    routeName: "별 경로 A",
-    type: "running",
-    distance: 5.8,
-    duration: 2340, // 39분
-    pace: "6'45\"",
-    calories: 342,
-    routeData: {
-      shapeId: "star",
-      shapeName: "별",
-      iconName: "star",
-    },
-    completedAt: "2026-01-18T19:15:00Z",
-  },
-  {
-    id: "workout_003",
-    routeName: "산책 경로",
-    type: "walking",
-    distance: 3.5,
-    duration: 2700, // 45분
-    pace: "12'51\"",
-    calories: 180,
-    routeData: {
-      shapeId: "custom",
-      shapeName: "커스텀",
-      iconName: "sparkles",
-    },
-    completedAt: "2026-01-17T10:20:00Z",
-  },
-  {
-    id: "workout_004",
-    routeName: "커피 경로 C",
-    type: "running",
-    distance: 3.5,
-    duration: 1500, // 25분
-    pace: "7'08\"",
-    calories: 206,
-    routeData: {
-      shapeId: "coffee",
-      shapeName: "커피",
-      iconName: "coffee",
-    },
-    completedAt: "2026-01-15T08:00:00Z",
-  },
-  {
-    id: "workout_005",
-    routeName: "강아지 경로 A",
-    type: "running",
-    distance: 6.2,
-    duration: 2580, // 43분
-    pace: "6'57\"",
-    calories: 365,
-    routeData: {
-      shapeId: "dog",
-      shapeName: "강아지",
-      iconName: "dog",
-    },
-    completedAt: "2026-01-12T17:45:00Z",
-  },
-];
+/** 백엔드 WorkoutSummary → 프론트 WorkoutRecord 변환 */
+function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
+  // route_name 에서 shape 추론 (예: "하트 경로 B" → heart)
+  const shapeMap: Record<
+    string,
+    { shapeId: string; shapeName: string; iconName: string }
+  > = {
+    하트: { shapeId: "heart", shapeName: "하트", iconName: "heart" },
+    별: { shapeId: "star", shapeName: "별", iconName: "star" },
+    커피: { shapeId: "coffee", shapeName: "커피", iconName: "coffee" },
+    강아지: { shapeId: "dog", shapeName: "강아지", iconName: "dog" },
+    고양이: { shapeId: "cat", shapeName: "고양이", iconName: "cat" },
+    스마일: { shapeId: "smile", shapeName: "스마일", iconName: "smile" },
+  };
+
+  let routeData = { shapeId: "custom", shapeName: "커스텀", iconName: "heart" };
+  for (const [keyword, data] of Object.entries(shapeMap)) {
+    if (w.route_name.includes(keyword)) {
+      routeData = data;
+      break;
+    }
+  }
+
+  return {
+    id: w.id,
+    routeId: w.route_id ?? null,
+    routeName: w.route_name,
+    type: (w.mode === "walking" ? "walking" : "running") as
+      | "running"
+      | "walking",
+    distance: w.distance ?? 0,
+    duration: w.duration ?? 0,
+    pace: w.avg_pace ?? "-",
+    calories: w.calories ?? 0,
+    isBookmarked: w.is_bookmarked ?? false,
+    routeData,
+    completedAt: w.completed_at ?? w.started_at,
+  };
+}
 
 type SortOrder = "latest" | "oldest";
 
 export default function WorkoutHistoryScreen() {
   const router = useRouter();
-  const [workouts, setWorkouts] = useState<WorkoutRecord[]>(MOCK_WORKOUTS);
+  const [workouts, setWorkouts] = useState<WorkoutRecord[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
+    null,
+  );
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutRecord | null>(
     null,
   );
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
+
+  /** 운동 기록 목록 로드 */
+  const loadWorkouts = useCallback(
+    async (sort: SortOrder = sortOrder) => {
+      try {
+        const response = await workoutApi.getWorkoutHistory({
+          page: 1,
+          limit: 50,
+          sort: sort === "latest" ? "date_desc" : "date_asc",
+        });
+
+        if (response.success && response.data) {
+          const records = response.data.workouts.map(toWorkoutRecord);
+          setWorkouts(records);
+        }
+      } catch (error) {
+        console.error("운동 기록 조회 실패:", error);
+      }
+    },
+    [sortOrder],
+  );
+
+  // 최초 로드
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      await loadWorkouts();
+      setIsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -167,38 +174,106 @@ export default function WorkoutHistoryScreen() {
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "latest" ? "oldest" : "latest";
     setSortOrder(newOrder);
-
-    const sorted = [...workouts].sort((a, b) => {
-      const dateA = new Date(a.completedAt).getTime();
-      const dateB = new Date(b.completedAt).getTime();
-      return newOrder === "latest" ? dateB - dateA : dateA - dateB;
-    });
-
-    setWorkouts(sorted);
+    loadWorkouts(newOrder);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-
-    // TODO: 실제 API 호출
-    // const response = await fetch('/api/v1/users/me/workouts?page=1&limit=20&sort=date_desc', {
-    //   headers: { Authorization: `Bearer ${token}` }
-    // });
-
-    // Mock: 새로고침 시뮬레이션
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await loadWorkouts();
     setIsRefreshing(false);
   };
 
   const handleWorkoutPress = (workout: WorkoutRecord) => {
     setSelectedWorkout(workout);
+    setSelectedWorkoutId(workout.id);
     setIsModalVisible(true);
   };
 
   const handleCloseModal = () => {
     setIsModalVisible(false);
     setSelectedWorkout(null);
+    setSelectedWorkoutId(null);
+  };
+
+  /** 경로 북마크 토글 */
+  const handleToggleBookmark = async (workout: WorkoutRecord) => {
+    if (!workout.routeId) return;
+
+    const wasBookmarked = workout.isBookmarked;
+
+    // 낙관적 업데이트
+    setWorkouts((prev) =>
+      prev.map((w) =>
+        w.id === workout.id ? { ...w, isBookmarked: !wasBookmarked } : w,
+      ),
+    );
+
+    try {
+      if (wasBookmarked) {
+        await savedRouteApi.unsaveRoute(workout.routeId);
+      } else {
+        await savedRouteApi.saveRoute(workout.routeId);
+      }
+    } catch (error) {
+      // 실패 시 롤백
+      setWorkouts((prev) =>
+        prev.map((w) =>
+          w.id === workout.id ? { ...w, isBookmarked: wasBookmarked } : w,
+        ),
+      );
+      console.error("북마크 토글 실패:", error);
+      Alert.alert("오류", "북마크 변경에 실패했습니다. 다시 시도해주세요.");
+    }
+  };
+
+  /** 운동 기록 삭제 */
+  const handleDeleteWorkout = (workout: WorkoutRecord) => {
+    // 스와이프 닫기
+    swipeableRefs.current.get(workout.id)?.close();
+
+    Alert.alert(
+      "기록 삭제",
+      `"${workout.routeName}" 기록을 삭제하시겠습니까?\n삭제된 기록은 복구할 수 없습니다.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await workoutApi.deleteWorkoutRecord(workout.id);
+              if (response.success) {
+                setWorkouts((prev) => prev.filter((w) => w.id !== workout.id));
+              }
+            } catch (error) {
+              console.error("운동 기록 삭제 실패:", error);
+              Alert.alert(
+                "오류",
+                "기록 삭제에 실패했습니다. 다시 시도해주세요.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  /** 스와이프 시 오른쪽에 나타나는 삭제 버튼 */
+  const renderRightActions = (workout: WorkoutRecord) => {
+    return (
+      <TouchableOpacity
+        style={styles.deleteAction}
+        activeOpacity={0.7}
+        onPress={() => handleDeleteWorkout(workout)}
+      >
+        <View style={styles.deleteActionContent}>
+          <View style={styles.deleteIconContainer}>
+            <Trash2 size={20} color="#f87171" />
+          </View>
+          <Text style={styles.deleteActionText}>삭제</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   const renderWorkoutCard = ({
@@ -216,89 +291,126 @@ export default function WorkoutHistoryScreen() {
         entering={FadeInUp.delay(index * 50).duration(400)}
         style={styles.cardWrapper}
       >
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.7}
-          onPress={() => handleWorkoutPress(item)}
+        <Swipeable
+          ref={(ref) => {
+            if (ref) {
+              swipeableRefs.current.set(item.id, ref);
+            } else {
+              swipeableRefs.current.delete(item.id);
+            }
+          }}
+          renderRightActions={() => renderRightActions(item)}
+          overshootRight={false}
+          friction={2}
         >
-          {/* 왼쪽: 아이콘 */}
-          <View
-            style={[
-              styles.iconContainer,
-              {
-                backgroundColor: isRunning
-                  ? `${Colors.emerald[500]}20`
-                  : `${Colors.blue[500]}20`,
-              },
-            ]}
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.7}
+            onPress={() => handleWorkoutPress(item)}
           >
-            <RouteIcon
-              size={32}
-              color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
-              strokeWidth={1.5}
-            />
-          </View>
+            {/* 왼쪽: 아이콘 */}
+            <View
+              style={[
+                styles.iconContainer,
+                {
+                  backgroundColor: isRunning
+                    ? `${Colors.emerald[500]}20`
+                    : `${Colors.blue[500]}20`,
+                },
+              ]}
+            >
+              <RouteIcon
+                size={32}
+                color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
+                strokeWidth={1.5}
+              />
+            </View>
 
-          {/* 중앙: 운동 정보 */}
-          <View style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.routeName}>{item.routeName}</Text>
-              <View
-                style={[
-                  styles.typeBadge,
-                  {
-                    backgroundColor: isRunning
-                      ? `${Colors.emerald[500]}20`
-                      : `${Colors.blue[500]}20`,
-                  },
-                ]}
-              >
-                <Text
+            {/* 중앙: 운동 정보 */}
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.routeName}>{item.routeName}</Text>
+                <View
                   style={[
-                    styles.typeText,
+                    styles.typeBadge,
                     {
-                      color: isRunning ? Colors.emerald[400] : Colors.blue[400],
+                      backgroundColor: isRunning
+                        ? `${Colors.emerald[500]}20`
+                        : `${Colors.blue[500]}20`,
                     },
                   ]}
                 >
-                  {isRunning ? "러닝" : "산책"}
-                </Text>
+                  <Text
+                    style={[
+                      styles.typeText,
+                      {
+                        color: isRunning
+                          ? Colors.emerald[400]
+                          : Colors.blue[400],
+                      },
+                    ]}
+                  >
+                    {isRunning ? "러닝" : "산책"}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/* 통계 그리드 */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <MapPin size={14} color={Colors.zinc[500]} />
-                <Text style={styles.statText}>
-                  {item.distance.toFixed(1)}km
-                </Text>
+              {/* 통계 그리드 */}
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <MapPin size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.statText}>
+                    {item.distance.toFixed(1)}km
+                  </Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Clock size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.statText}>
+                    {formatDuration(item.duration)}
+                  </Text>
+                </View>
+                <View style={styles.statItem}>
+                  <TrendingUp size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.statText}>{item.pace}/km</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Flame size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.statText}>{item.calories}kcal</Text>
+                </View>
               </View>
-              <View style={styles.statItem}>
-                <Clock size={14} color={Colors.zinc[500]} />
-                <Text style={styles.statText}>
-                  {formatDuration(item.duration)}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <TrendingUp size={14} color={Colors.zinc[500]} />
-                <Text style={styles.statText}>{item.pace}/km</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Flame size={14} color={Colors.zinc[500]} />
-                <Text style={styles.statText}>{item.calories}kcal</Text>
-              </View>
-            </View>
 
-            {/* 날짜 */}
-            <View style={styles.dateRow}>
-              <Calendar size={12} color={Colors.zinc[600]} />
-              <Text style={styles.dateText}>
-                {formatDate(item.completedAt)}
-              </Text>
+              {/* 날짜 + 북마크 */}
+              <View style={styles.dateRow}>
+                <View style={styles.dateInfo}>
+                  <Calendar size={12} color={Colors.zinc[600]} />
+                  <Text style={styles.dateText}>
+                    {formatDate(item.completedAt)}
+                  </Text>
+                </View>
+                {item.routeId && (
+                  <TouchableOpacity
+                    style={styles.bookmarkButton}
+                    activeOpacity={0.6}
+                    onPress={() => handleToggleBookmark(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Bookmark
+                      size={16}
+                      color={
+                        item.isBookmarked
+                          ? Colors.emerald[400]
+                          : Colors.zinc[600]
+                      }
+                      fill={
+                        item.isBookmarked ? Colors.emerald[400] : "transparent"
+                      }
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </Swipeable>
       </Animated.View>
     );
   };
@@ -351,31 +463,39 @@ export default function WorkoutHistoryScreen() {
         onBack={() => router.back()}
       />
 
-      <FlatList
-        data={workouts}
-        renderItem={renderWorkoutCard}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={workouts.length > 0 ? renderHeader : null}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={[
-          styles.listContent,
-          workouts.length === 0 && styles.listContentEmpty,
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.emerald[500]}
-            colors={[Colors.emerald[500]]}
-          />
-        }
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.emerald[500]} />
+          <Text style={styles.loadingText}>기록을 불러오는 중...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={workouts}
+          renderItem={renderWorkoutCard}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={workouts.length > 0 ? renderHeader : null}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={[
+            styles.listContent,
+            workouts.length === 0 && styles.listContentEmpty,
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.emerald[500]}
+              colors={[Colors.emerald[500]]}
+            />
+          }
+        />
+      )}
 
       <WorkoutDetailModal
         visible={isModalVisible}
         onClose={handleCloseModal}
         workout={selectedWorkout}
+        workoutId={selectedWorkoutId}
       />
     </SafeAreaView>
   );
@@ -385,6 +505,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.zinc[950],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[400],
   },
   listContent: {
     padding: Spacing.lg,
@@ -433,6 +563,8 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     marginBottom: Spacing.md,
+    overflow: "hidden",
+    borderRadius: BorderRadius["2xl"],
   },
   card: {
     flexDirection: "row",
@@ -492,7 +624,15 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateInfo: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
+  },
+  bookmarkButton: {
+    padding: 2,
   },
   dateText: {
     fontSize: FontSize.xs,
@@ -536,5 +676,29 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     color: "#fff",
+  },
+  deleteAction: {
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 88,
+  },
+  deleteActionContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  deleteIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteActionText: {
+    color: "#f87171",
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
   },
 });

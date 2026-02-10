@@ -118,7 +118,7 @@ export default function WorkoutScreen() {
 
         const response = await workoutApi.startWorkout({
           route_id: (params.routeId as string) || null,
-          route_option_id: (params.routeOptionId as string) || null,
+          route_option_id: (params.optionId as string) || null,
           route_name:
             (params.routeName as string) ||
             (params.shapeName as string) ||
