@@ -190,6 +190,11 @@ export class ApiClient {
         console.log("✅ Authorization 헤더 추가됨");
       } else {
         console.warn("⚠️ 토큰이 없습니다. 로그인이 필요합니다.");
+        // 토큰이 없으면 바로 로그아웃 콜백 실행 (로그인 페이지로 이동)
+        if (onUnauthorized) {
+          onUnauthorized();
+        }
+        throw new Error("인증 토큰이 없습니다. 다시 로그인해주세요.");
       }
     }
 
@@ -490,7 +495,10 @@ export const routeApi = {
     enable_rotation?: boolean;
     rotation_angles?: number[] | null;
   }): Promise<{ success: boolean; data: { task_id: string } }> {
-    return apiClient.post(API_CONFIG.ENDPOINTS.ROUTES.GENERATE_GPS_ART_ASYNC, body);
+    return apiClient.post(
+      API_CONFIG.ENDPOINTS.ROUTES.GENERATE_GPS_ART_ASYNC,
+      body,
+    );
   },
 
   /** 경로 생성 상태 조회 (completed 시 route_id, option_ids 포함) */
@@ -547,7 +555,6 @@ export const routeApi = {
       radius: data.radius ?? 2000,
     });
   },
-
 };
 
 // ============================================

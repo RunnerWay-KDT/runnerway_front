@@ -1,7 +1,23 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Colors } from "../../constants/theme";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ScreensLayout() {
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+
+  // 인증되지 않은 사용자는 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/(auth)/login");
+    }
+  }, [isAuthenticated, loading, router]);
+
+  if (loading || !isAuthenticated) {
+    return null;
+  }
+
   return (
     <Stack
       screenOptions={{
