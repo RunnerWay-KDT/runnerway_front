@@ -1,21 +1,14 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { View, Text, StyleSheet, ScrollView, Switch } from "react-native";
+import * as Location from "expo-location";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Battery,
-  Flame,
-  Trophy,
-  Moon,
-  Shield,
-  Clock,
-} from "lucide-react-native";
+import { Clock, Shield, Moon, Zap, Flame, Trophy } from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import Slider from "@react-native-community/slider";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { OptionCard } from "../../components/OptionCard";
-import { Switch } from "../../components/ui/Switch";
 import {
   Colors,
   FontSize,
@@ -24,41 +17,63 @@ import {
   BorderRadius,
 } from "../../constants/theme";
 
-interface Condition {
-  id: string;
-  title: string;
-  description: string;
-  Icon: React.ElementType;
-}
-
 export default function RunningSetupScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [duration, setDuration] = useState(30);
   const [condition, setCondition] = useState("recovery");
   const [safetyMode, setSafetyMode] = useState(true);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  const conditions: Condition[] = [
+  const conditions = [
     {
       id: "recovery",
       title: "회복 러닝",
-      description: "가볍게 몸을 풀어주는 편안한 페이스",
-      Icon: Battery,
+      description: "부상 없이 가볍게 뛰고 싶어요",
+      Icon: Zap,
     },
     {
-      id: "fat-burn",
+      id: "fat_burning",
       title: "지방 연소",
-      description: "적절한 심박수로 지방 연소 극대화",
+      description: "효과적으로 칼로리를 태우고 싶어요",
       Icon: Flame,
     },
     {
-      id: "challenge",
+      id: "challenge", // Changed from 'record' to match backend logic
       title: "기록 도전",
-      description: "목표를 향한 강도 높은 러닝",
+      description: "나의 한계를 뛰어넘고 싶어요",
       Icon: Trophy,
     },
   ];
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    let lat = params.startLat as string;
+    let lng = params.startLng as string;
+
+    // 전달받은 위치가 없으면 현재 위치 가져오기
+    if (!lat || !lng) {
+      try {
+        setIsLoadingLocation(true);
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          alert("위치 권한이 필요합니다.");
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({});
+        lat = location.coords.latitude.toString();
+        lng = location.coords.longitude.toString();
+      } catch (error) {
+        console.error("Location error:", error);
+        alert("현재 위치를 가져올 수 없습니다.");
+        setIsLoadingLocation(false);
+        return;
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    }
+
     router.push({
       pathname: "/(screens)/generating",
       params: {
@@ -66,6 +81,8 @@ export default function RunningSetupScreen() {
         duration: duration.toString(),
         condition,
         safetyMode: safetyMode.toString(),
+        startLat: lat,
+        startLng: lng,
       },
     });
   };
@@ -154,7 +171,9 @@ export default function RunningSetupScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <PrimaryButton onPress={handleGenerate}>경로 생성하기</PrimaryButton>
+        <PrimaryButton onPress={handleGenerate} loading={isLoadingLocation}>
+          경로 생성하기
+        </PrimaryButton>
       </View>
     </SafeAreaView>
   );

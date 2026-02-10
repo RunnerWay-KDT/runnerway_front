@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
+import * as Location from "expo-location";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Clock, Route } from "lucide-react-native";
@@ -19,15 +20,43 @@ export default function DrawingSetupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [duration, setDuration] = useState(30);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   // 시속 4km 기준으로 예상 거리 계산
-  const WALKING_SPEED_KM_PER_HOUR = 5;
+  const WALKING_SPEED_KM_PER_HOUR = 4; // 5 -> 4로 수정되어 있네요
   const estimatedDistance = (
     (duration / 60) *
     WALKING_SPEED_KM_PER_HOUR
   ).toFixed(1);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    let lat = params.startLat as string;
+    let lng = params.startLng as string;
+
+    // 전달받은 위치가 없으면 현재 위치 가져오기
+    if (!lat || !lng) {
+      try {
+        setIsLoadingLocation(true);
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          alert("위치 권한이 필요합니다.");
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({});
+        lat = location.coords.latitude.toString();
+        lng = location.coords.longitude.toString();
+      } catch (error) {
+        console.error("Location error:", error);
+        alert("현재 위치를 가져올 수 없습니다.");
+        setIsLoadingLocation(false);
+        return;
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    }
+
     // 프리셋 모드인 경우
     if (params.mode === "preset") {
       router.push({
@@ -40,8 +69,8 @@ export default function DrawingSetupScreen() {
           shapeDistance: params.shapeDistance,
           targetDuration: duration.toString(),
           targetDistanceKm: estimatedDistance,
-          startLat: params.startLat as string | undefined,
-          startLng: params.startLng as string | undefined,
+          startLat: lat,
+          startLng: lng,
         },
       });
     }
@@ -58,8 +87,8 @@ export default function DrawingSetupScreen() {
           routeId: params.routeId,
           targetDuration: duration.toString(),
           targetDistanceKm: estimatedDistance,
-          startLat: params.startLat as string | undefined,
-          startLng: params.startLng as string | undefined,
+          startLat: lat,
+          startLng: lng,
         },
       });
     }
@@ -139,7 +168,7 @@ export default function DrawingSetupScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <PrimaryButton onPress={handleGenerate}>경로 생성하기</PrimaryButton>
+        <PrimaryButton onPress={handleGenerate} loading={isLoadingLocation}>경로 생성하기</PrimaryButton>
       </View>
     </SafeAreaView>
   );

@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router";
+import * as Location from "expo-location";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Clock, Gauge, MapPin, Plus, Sparkles, X } from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
@@ -37,10 +38,13 @@ interface IntensityOption {
 
 export default function WalkingSetupScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [duration, setDuration] = useState(30);
   const [intensity, setIntensity] = useState("moderate");
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [showWaypointModal, setShowWaypointModal] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{lat: string, lng: string} | null>(null);
 
   const intensityOptions: IntensityOption[] = [
     { id: "light", label: "가볍게", description: "여유로운 산책" },
@@ -48,11 +52,49 @@ export default function WalkingSetupScreen() {
     { id: "brisk", label: "빠르게", description: "활기찬 워킹" },
   ];
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    let lat = params.startLat as string;
+    let lng = params.startLng as string;
+
+    // 전달받은 위치가 없으면 현재 위치 가져오기
+    if (!lat || !lng) {
+      if (currentLocation) {
+         lat = currentLocation.lat;
+         lng = currentLocation.lng;
+      } else {
+        try {
+          setIsLoadingLocation(true);
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            alert("위치 권한이 필요합니다.");
+            setIsLoadingLocation(false);
+            return;
+          }
+
+          const location = await Location.getCurrentPositionAsync({});
+          lat = location.coords.latitude.toString();
+          lng = location.coords.longitude.toString();
+          setCurrentLocation({ lat, lng });
+        } catch (error) {
+          console.error("Location error:", error);
+          alert("현재 위치를 가져올 수 없습니다.");
+          setIsLoadingLocation(false);
+          return;
+        } finally {
+          setIsLoadingLocation(false);
+        }
+      }
+    }
+    
+    // 위치 확보 후 모달 오픈
     setShowWaypointModal(true);
   };
 
   const handleFinalGenerate = (confirmedWaypoints: Waypoint[]) => {
+    // 1순위: params, 2순위: state
+    const lat = (params.startLat as string) || currentLocation?.lat;
+    const lng = (params.startLng as string) || currentLocation?.lng;
+
     router.push({
       pathname: "/(screens)/generating",
       params: {
@@ -60,6 +102,8 @@ export default function WalkingSetupScreen() {
         duration: duration.toString(),
         intensity,
         waypoints: JSON.stringify(confirmedWaypoints),
+        startLat: lat,
+        startLng: lng,
       },
     });
   };

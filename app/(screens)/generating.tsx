@@ -53,6 +53,15 @@ export default function GeneratingScreen() {
 
     // running: recommendRoute API (동기 API + 진행 바 애니메이션)
     if (mode === "running") {
+      // 1. 이미 시작되었으면 즉시 종료 (Strict Mode 방어)
+      if (startedRef.current) {
+        console.log("[GeneratingScreen] Already started, skipping effect.");
+        return;
+      }
+      // 2. 실행 플래그 설정
+      startedRef.current = true;
+      console.log("[GeneratingScreen] Starting recommendation flow...");
+
       const run = async () => {
         // 진행률 애니메이션 (실제 진행과 무관하게 점진적 증가)
         const timer = setInterval(() => {
