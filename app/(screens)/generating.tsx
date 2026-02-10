@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Dimensions, Alert } from "react-native";
-=======
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from "react-native";
->>>>>>> master
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
 import { routeApi } from "../../utils/api";
