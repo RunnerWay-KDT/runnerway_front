@@ -133,10 +133,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 3,
     borderColor: "#fff",
-    shadowColor: "#10b981",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    boxShadow: "0px 0px 10px rgba(16, 185, 129, 0.5)",
     elevation: 5,
   },
   markerText: {

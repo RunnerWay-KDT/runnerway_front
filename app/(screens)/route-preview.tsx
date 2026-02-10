@@ -77,11 +77,11 @@ export default function RoutePreviewScreen() {
         safety: 90 - (index * 2), // Mock score difference
         elevation: 10 + (index * 5),
         lighting: 85,
-        sidewalk: 95,
+
         convenience: 3,
         difficulty: index === 0 ? "쉬움" : index === 1 ? "보통" : "도전",
         tag: index === 0 ? "추천" : null,
-        path: candidate.path // Store path data in option
+        coordinates: candidate.path // Map path to coordinates
       }));
     }
 
@@ -137,10 +137,6 @@ export default function RoutePreviewScreen() {
     ];
   };
 
-<<<<<<< HEAD
-  const routeOptions = generateRouteOptions();
-  const [selectedRoute, setSelectedRoute] = useState(routeOptions[0]); 
-=======
   const fallbackOptions = generateRouteOptions();
   const [fetchedOptions, setFetchedOptions] = useState<RouteOption[] | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -148,7 +144,6 @@ export default function RoutePreviewScreen() {
 
   const routeOptions = fetchedOptions ?? fallbackOptions;
   const [selectedRoute, setSelectedRoute] = useState(routeOptions[1]);
->>>>>>> master
 
   const routeId = params.routeId as string | undefined;
 
@@ -190,7 +185,7 @@ export default function RoutePreviewScreen() {
           safety: opt.scores?.safety ?? 0,
           elevation: opt.scores?.elevation ?? 0,
           lighting: (opt.scores as { lighting?: number })?.lighting ?? 0,
-          sidewalk: (opt.scores as { sidewalk?: number })?.sidewalk ?? 0,
+
           convenience: 0,
           difficulty: opt.difficulty ?? "보통",
           tag: opt.tag ?? null,

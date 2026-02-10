@@ -12,11 +12,7 @@ import type {
   UpdateProfileRequest,
   ApiResponse,
   RouteRequest,
-<<<<<<< HEAD
-  RecommendRouteResponse
-=======
   RecommendRouteResponse,
->>>>>>> master
 } from "../types/api";
 
 // ============================================

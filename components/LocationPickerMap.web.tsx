@@ -117,10 +117,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4A90E2",
     borderWidth: 4,
     borderColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.3)",
     elevation: 5,
   },
   pinPoint: {

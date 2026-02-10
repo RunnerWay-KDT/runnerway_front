@@ -95,6 +95,8 @@ export interface RouteRequest {
   lat: number;
   lng: number;
   prompt: string;
+  target_time_min?: number;
+  target_distance_km?: number;
 }
 
 export interface RecommendRouteResponse {

@@ -51,31 +51,37 @@ export default function GeneratingScreen() {
     cancelledRef.current = false;
     const mode = params.mode as string | undefined;
 
-    // running: recommendRoute API
+    // running: recommendRoute API (동기 API + 진행 바 애니메이션)
     if (mode === "running") {
       const run = async () => {
+        // 진행률 애니메이션 (실제 진행과 무관하게 점진적 증가)
         const timer = setInterval(() => {
-          setProgress((prev) => (prev < 90 ? prev + 1 : prev));
-        }, 100);
+          setProgress((prev) => (prev < 90 ? prev + 2 : prev));
+        }, 200);
 
+        // conditionMap: 프론트엔드 condition 값 → 백엔드가 인식하는 키워드 포함한 prompt
         const conditionMap: Record<string, string> = {
-          flat: "목적: 평지 위주 러닝",
-          balanced: "목적: 복합 지형(밸런스) 러닝",
-          uphill: "목적: 언덕/업힐 도전 러닝",
+          recovery: "recovery 회복 러닝 easy",
+          "fat-burn": "fat burn 지방 연소 러닝",
+          challenge: "challenge 기록 도전 hard 러닝",
         };
-        const condition = (params.condition as string) || "flat";
+        const condition = (params.condition as string) || "recovery";
         const safetyMode = (params.safetyMode as string) || "false";
-        const basePrompt = conditionMap[condition];
+        const basePrompt = conditionMap[condition] || conditionMap["recovery"];
         const safetyPrompt = safetyMode === "true" ? " (안전 우선)" : "";
 
         try {
           const lat = parseFloat((params.startLat as string) || "37.5005");
           const lng = parseFloat((params.startLng as string) || "127.0365");
+          const duration = params.duration ? parseFloat(params.duration as string) : undefined;
+          
+          console.log("[GeneratingScreen] Requesting route with:", { lat, lng, prompt: `${basePrompt}${safetyPrompt}`, duration });
 
           const response = await routeApi.recommendRoute({
             lat,
             lng,
             prompt: `${basePrompt}${safetyPrompt}`,
+            target_time_min: duration,
           });
 
           if (cancelledRef.current) return;
@@ -107,7 +113,7 @@ export default function GeneratingScreen() {
       run();
       return () => {
         cancelledRef.current = true;
-      }
+      };
     }
 
     // 그림 경로: custom / shape -> 비동기 생성(시작 후 폴링, 타임아웃 방지)
