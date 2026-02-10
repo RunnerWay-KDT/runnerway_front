@@ -8,7 +8,7 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react-native";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -26,20 +26,166 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { getIconComponent } from "../../utils/shapeIcons";
+import { workoutApi } from "../../utils/api";
 
 export default function ResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const hasCalledCompleteApi = useRef(false);
 
   const isCustomDrawing = params.mode === "custom";
   const iconName = (params.shapeIconName as string) || "heart";
-  const RouteIcon = getIconComponent(iconName);
 
   const distance = (params.completedDistance as string) || "4.20";
   const time = parseInt((params.completedTime as string) || "1723", 10);
   const pace = (params.averagePace as string) || "6'50\"";
   const calories = parseInt((params.calories as string) || "247", 10);
+
+  // workout.tsx에서 전달받은 데이터
+  const workoutId = (params.workoutId as string) || "";
+  const actualPathRaw = (params.actualPath as string) || "[]";
+  const splitsDataRaw = (params.splitsData as string) || "[]";
+  const endLatitude = (params.endLatitude as string) || "";
+  const endLongitude = (params.endLongitude as string) || "";
+  const routeCompletion = parseFloat((params.routeCompletion as string) || "0");
+
+  // workout.tsx에서 전달받은 planned path (routePolyline 파라미터)
+  const routePolylineRaw = (params.routePolyline as string) || "[]";
+
+  // 경로 비교를 위한 state
+  const [plannedPath, setPlannedPath] = useState<
+    { lat: number; lng: number }[]
+  >([]);
+  const [actualPath, setActualPath] = useState<{ lat: number; lng: number }[]>(
+    [],
+  );
+
+  // 초기값: params에서 파싱
+  useEffect(() => {
+    // planned path: workout.tsx에서 전달받은 routePolyline
+    try {
+      const parsed = JSON.parse(routePolylineRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setPlannedPath(parsed);
+      }
+    } catch {
+      // ignore
+    }
+
+    // actual path: workout.tsx에서 전달받은 actualPath
+    try {
+      const parsed = JSON.parse(actualPathRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setActualPath(
+          parsed.map((p: { lat: number; lng: number }) => ({
+            lat: p.lat,
+            lng: p.lng,
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, [routePolylineRaw, actualPathRaw]);
+
+  // ============================================
+  // 운동 완료 API 호출 → workouts UPDATE + workout_splits INSERT
+  // ============================================
+  useEffect(() => {
+    if (hasCalledCompleteApi.current) return;
+    if (!workoutId) {
+      console.warn("⚠️ workoutId가 없어 완료 API를 호출하지 않습니다");
+      return;
+    }
+    hasCalledCompleteApi.current = true;
+
+    const completeWorkout = async () => {
+      try {
+        let actualPathData: {
+          lat: number;
+          lng: number;
+          timestamp?: number;
+        }[] = [];
+        try {
+          actualPathData = JSON.parse(actualPathRaw);
+        } catch {
+          actualPathData = [];
+        }
+
+        let splitsArr: { km: number; pace: string; duration: number }[] = [];
+        try {
+          splitsArr = JSON.parse(splitsDataRaw);
+        } catch {
+          splitsArr = [];
+        }
+
+        const response = await workoutApi.completeWorkout(workoutId, {
+          completed_at: new Date().toISOString(),
+          final_metrics: {
+            distance: parseFloat(distance),
+            duration: time,
+            average_pace: pace,
+            calories: calories,
+          },
+          route: {
+            actual_path: actualPathData,
+          },
+          splits: splitsArr.length > 0 ? splitsArr : null,
+          end_location:
+            endLatitude && endLongitude
+              ? {
+                  latitude: parseFloat(endLatitude),
+                  longitude: parseFloat(endLongitude),
+                }
+              : null,
+          route_completion: routeCompletion > 0 ? routeCompletion : null,
+        });
+
+        if (response.success) {
+          console.log("✅ 운동 완료 저장 성공:", response.data);
+
+          // 서버에서 반환한 planned_path가 있으면 업데이트
+          if (
+            response.data?.planned_path &&
+            response.data.planned_path.length > 0
+          ) {
+            setPlannedPath(response.data.planned_path);
+          }
+
+          // 서버에서 반환한 actual_path가 있으면 업데이트
+          if (
+            response.data?.actual_path &&
+            response.data.actual_path.length > 0
+          ) {
+            setActualPath(
+              response.data.actual_path.map(
+                (p: { lat: number; lng: number }) => ({
+                  lat: p.lat,
+                  lng: p.lng,
+                }),
+              ),
+            );
+          }
+        }
+      } catch (error) {
+        console.error("❌ 운동 완료 API 실패:", error);
+        // API 실패해도 화면은 정상 표시
+      }
+    };
+
+    completeWorkout();
+  }, [
+    workoutId,
+    distance,
+    time,
+    pace,
+    calories,
+    actualPathRaw,
+    splitsDataRaw,
+    endLatitude,
+    endLongitude,
+    routeCompletion,
+  ]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -98,32 +244,48 @@ export default function ResultScreen() {
         훌륭한 러닝이었습니다
       </Animated.Text>
 
-      {/* Map Section */}
+      {/* Map Section - 계획 경로 vs 실제 경로 비교 */}
       <Animated.View
         entering={FadeInUp.delay(450).duration(400)}
         style={styles.mapContainer}
       >
-        <KakaoMap routePath={iconName} />
+        <KakaoMap
+          routePath={iconName}
+          plannedPath={plannedPath.length > 0 ? plannedPath : undefined}
+          actualPath={actualPath.length > 0 ? actualPath : undefined}
+        />
+        {/* 경로 범례 */}
+        {(plannedPath.length > 0 || actualPath.length > 0) && (
+          <View style={styles.mapLegend}>
+            {plannedPath.length > 0 && (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendLine, styles.legendPlanned]} />
+                <Text style={styles.legendText}>계획 경로</Text>
+              </View>
+            )}
+            {actualPath.length > 0 && (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendLine, styles.legendActual]} />
+                <Text style={styles.legendText}>실제 경로</Text>
+              </View>
+            )}
+          </View>
+        )}
+        {/* 완주율 뱃지 */}
+        {routeCompletion > 0 && (
+          <View style={styles.completionBadge}>
+            <Text style={styles.completionText}>
+              완주율 {Math.round(routeCompletion)}%
+            </Text>
+          </View>
+        )}
       </Animated.View>
 
-      {/* Route Card */}
+      {/* Distance Badge */}
       <Animated.View
         entering={FadeInUp.delay(500).duration(400)}
-        style={styles.routeCard}
+        style={styles.distanceBadgeContainer}
       >
-        <View style={styles.routeIconContainer}>
-          {isCustomDrawing ? (
-            <View style={styles.customIconWrapper}>
-              <Sparkles size={48} color={Colors.purple[400]} />
-            </View>
-          ) : (
-            <RouteIcon
-              size={96}
-              color={`${Colors.emerald[500]}30`}
-              strokeWidth={1.5}
-            />
-          )}
-        </View>
         <View style={styles.distanceBadge}>
           <Text style={styles.distanceText}>{distance} km</Text>
         </View>
@@ -246,40 +408,69 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     width: "100%",
-    height: 250,
+    height: 400,
     backgroundColor: Colors.zinc[900],
     borderRadius: BorderRadius["2xl"],
     borderWidth: 1,
     borderColor: Colors.zinc[800],
     overflow: "hidden",
-    marginBottom: Spacing.lg,
-  },
-  routeCard: {
-    width: "100%",
-    aspectRatio: 1,
-    backgroundColor: Colors.zinc[900],
-    borderRadius: BorderRadius["2xl"],
-    borderWidth: 1,
-    borderColor: Colors.zinc[800],
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     position: "relative",
-    overflow: "hidden",
   },
-  routeIconContainer: {
-    justifyContent: "center",
+  mapLegend: {
+    position: "absolute",
+    bottom: Spacing.sm,
+    left: Spacing.sm,
+    flexDirection: "row",
+    gap: Spacing.md,
+    backgroundColor: `${Colors.zinc[900]}E6`,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+  },
+  legendItem: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
   },
-  customIconWrapper: {
-    position: "relative",
+  legendLine: {
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+  },
+  legendPlanned: {
+    backgroundColor: Colors.zinc[400],
+  },
+  legendActual: {
+    backgroundColor: Colors.emerald[400],
+  },
+  legendText: {
+    fontSize: FontSize.xs,
+    color: Colors.zinc[300],
+  },
+  completionBadge: {
+    position: "absolute",
+    top: Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: `${Colors.emerald[500]}CC`,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  completionText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: "#fff",
+  },
+  distanceBadgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
   distanceBadge: {
-    position: "absolute",
-    top: Spacing.md,
-    right: Spacing.md,
     backgroundColor: Colors.emerald[500],
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
   },

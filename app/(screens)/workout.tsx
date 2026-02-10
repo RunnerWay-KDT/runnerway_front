@@ -27,6 +27,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
+import { workoutApi } from "../../utils/api";
 
 interface LocationCoords {
   latitude: number;
@@ -58,6 +59,9 @@ export default function WorkoutScreen() {
     { start: number; end: number; pace: string; time: number }[]
   >([]);
 
+  // 서버에서 받은 workout ID (workouts 테이블의 id)
+  const [workoutId, setWorkoutId] = useState<string | null>(null);
+
   // GPS 관련 상태
   const locationSubscription = useRef<Location.LocationSubscription | null>(
     null,
@@ -68,11 +72,6 @@ export default function WorkoutScreen() {
   const pathUpdateCounter = useRef(0);
   const lastSplitDistance = useRef(0);
   const lastSplitTime = useRef(0);
-
-  // params에서 경로 정보 가져오기
-  const routePathFromParams = params.routePath
-    ? JSON.parse(params.routePath as string)
-    : null;
 
   const targetDistance = parseFloat((params.targetDistance as string) || "4.2");
   const iconName = (params.shapeIconName as string) || "heart";
@@ -88,15 +87,64 @@ export default function WorkoutScreen() {
       return [];
     }
   })();
-  const mapCenter = workoutPolyline.length > 0
-    ? {
-      lat: workoutPolyline.reduce((s, p) => s + p.lat, 0) / workoutPolyline.length,
-      lng: workoutPolyline.reduce((s, p) => s + p.lng, 0) / workoutPolyline.length,
-    }
-    : undefined;
+  const mapCenter =
+    workoutPolyline.length > 0
+      ? {
+          lat:
+            workoutPolyline.reduce((s, p) => s + p.lat, 0) /
+            workoutPolyline.length,
+          lng:
+            workoutPolyline.reduce((s, p) => s + p.lng, 0) /
+            workoutPolyline.length,
+        }
+      : undefined;
 
   const progress = Math.min(distance / targetDistance, 1);
   const progressWidth = useSharedValue(0);
+
+  // ============================================
+  // 운동 시작 API 호출 → workouts 테이블에 INSERT
+  // ============================================
+  useEffect(() => {
+    const startWorkoutSession = async () => {
+      try {
+        // GPS 권한으로 현재 위치 가져오기
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+        });
+
+        const response = await workoutApi.startWorkout({
+          route_id: (params.routeId as string) || null,
+          route_option_id: (params.routeOptionId as string) || null,
+          route_name:
+            (params.routeName as string) ||
+            (params.shapeName as string) ||
+            "운동",
+          type: (params.routeType as string) || null,
+          mode: (params.mode as string) || null,
+          start_location: {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          },
+          started_at: new Date().toISOString(),
+        });
+
+        if (response.success && response.data?.workout_id) {
+          setWorkoutId(response.data.workout_id);
+          console.log("✅ 운동 시작 (workout_id):", response.data.workout_id);
+        }
+      } catch (error) {
+        console.error("❌ 운동 시작 API 실패:", error);
+        // API 실패해도 로컬 운동은 계속 진행
+      }
+    };
+
+    startWorkoutSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Haversine 공식으로 두 좌표 간 거리 계산 (미터)
   const calculateDistance = useCallback(
@@ -357,14 +405,37 @@ export default function WorkoutScreen() {
   };
 
   const handleStop = () => {
+    // routeCoordinates → actual_path (workouts.actual_path에 저장될 데이터)
+    const actualPathData = routeCoordinates.current.map((coord) => ({
+      lat: coord.latitude,
+      lng: coord.longitude,
+      timestamp: coord.timestamp,
+    }));
+
+    // splits → workout_splits 테이블에 저장될 데이터
+    const splitsData = splits.map((split) => ({
+      km: split.end,
+      pace: split.pace,
+      duration: split.time - (splits[splits.indexOf(split) - 1]?.time || 0),
+    }));
+
+    const lastCoord =
+      routeCoordinates.current[routeCoordinates.current.length - 1];
+
     router.replace({
       pathname: "/(screens)/result",
       params: {
         ...params,
+        workoutId: workoutId || "",
         completedDistance: distance.toFixed(2),
         completedTime: time.toString(),
         averagePace: pace,
         calories: Math.round(distance * 60).toString(),
+        actualPath: JSON.stringify(actualPathData),
+        splitsData: JSON.stringify(splitsData),
+        endLatitude: lastCoord ? lastCoord.latitude.toString() : "",
+        endLongitude: lastCoord ? lastCoord.longitude.toString() : "",
+        routeCompletion: Math.round(progress * 100).toString(),
       },
     });
   };
@@ -372,24 +443,16 @@ export default function WorkoutScreen() {
   const calories = Math.round(distance * 60);
   const remainingDistance = Math.max(0, targetDistance - distance);
 
-  // 지도에 표시할 경로 데이터 (미리 정해진 경로)
-  const plannedRoute = routePathFromParams
-    ? routePathFromParams.map((point: any) => ({
-        lat: point.latitude || point.lat,
-        lng: point.longitude || point.lng,
-      }))
-    : [];
-
   return (
     <View style={styles.container}>
       {/* Background Map */}
-      <LiveKakaoMap 
-      routePath={iconName} 
-      progress={progress}
-      polyline={workoutPolyline.length > 0 ? workoutPolyline : undefined}
-      center={mapCenter} 
-      currentPosition={currentLocation || undefined}
-      actualPath={actualRoute.length > 0 ? actualRoute : undefined}
+      <LiveKakaoMap
+        routePath={iconName}
+        progress={progress}
+        polyline={workoutPolyline.length > 0 ? workoutPolyline : undefined}
+        center={mapCenter}
+        currentPosition={currentLocation || undefined}
+        actualPath={actualRoute.length > 0 ? actualRoute : undefined}
       />
 
       {/* Top Controls */}

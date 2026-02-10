@@ -101,3 +101,75 @@ export interface RecommendRouteResponse {
   candidates?: Array<unknown>;
   [key: string]: unknown;
 }
+
+// ============================================
+// 운동 관련 타입 (workouts + workout_splits 테이블 기반)
+// ============================================
+
+export interface WorkoutStartRequest {
+  route_id?: string | null;
+  route_option_id?: string | null;
+  route_name: string;
+  type?: string | null; // preset / custom / null
+  mode?: string | null; // running / walking / null
+  start_location: {
+    latitude: number;
+    longitude: number;
+  };
+  started_at: string; // ISO 8601 datetime
+}
+
+export interface WorkoutStartResponse {
+  success: boolean;
+  data: {
+    workout_id: string;
+    status: string;
+    started_at: string;
+  };
+  message: string;
+}
+
+export interface WorkoutSplit {
+  km: number;
+  pace: string;
+  duration: number; // 초
+}
+
+export interface WorkoutCompleteRequest {
+  completed_at: string; // ISO 8601 datetime
+  final_metrics: {
+    distance: number; // km
+    duration: number; // 초
+    average_pace: string; // 예: "6'30\""
+    calories: number; // kcal
+    max_pace?: string | null;
+    min_pace?: string | null;
+  };
+  route: {
+    actual_path: { lat: number; lng: number; timestamp?: number }[];
+  };
+  splits?: WorkoutSplit[] | null;
+  end_location?: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  elevation_gain?: number | null;
+  elevation_loss?: number | null;
+  route_completion?: number | null; // 0-100
+}
+
+export interface WorkoutCompleteResponse {
+  success: boolean;
+  data: {
+    workout_id: string;
+    completed_distance: number;
+    completed_time: number;
+    average_pace: string;
+    calories: number;
+    route_completion?: number | null;
+    planned_path?: { lat: number; lng: number }[] | null;
+    actual_path?: { lat: number; lng: number; timestamp?: number }[] | null;
+    saved_at: string;
+  };
+  message: string;
+}

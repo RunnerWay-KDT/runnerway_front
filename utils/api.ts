@@ -13,6 +13,10 @@ import type {
   ApiResponse,
   RouteRequest,
   RecommendRouteResponse,
+  WorkoutStartRequest,
+  WorkoutStartResponse,
+  WorkoutCompleteRequest,
+  WorkoutCompleteResponse,
 } from "../types/api";
 
 // ============================================
@@ -608,6 +612,69 @@ export const settingsApi = {
     }>
   > {
     return apiClient.patch("/api/v1/users/me/settings", data);
+  },
+};
+
+// ============================================
+// 운동 API (workouts + workout_splits 테이블)
+// ============================================
+
+export const workoutApi = {
+  /**
+   * 운동 시작 → workouts 테이블에 INSERT
+   */
+  async startWorkout(data: WorkoutStartRequest): Promise<WorkoutStartResponse> {
+    return apiClient.post<WorkoutStartResponse>(
+      API_CONFIG.ENDPOINTS.WORKOUTS.START,
+      data,
+    );
+  },
+
+  /**
+   * 운동 완료 → workouts UPDATE + workout_splits INSERT
+   */
+  async completeWorkout(
+    workoutId: string,
+    data: WorkoutCompleteRequest,
+  ): Promise<WorkoutCompleteResponse> {
+    return apiClient.post<WorkoutCompleteResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.COMPLETE}/${workoutId}/complete`,
+      data,
+    );
+  },
+
+  /**
+   * 운동 일시정지
+   */
+  async pauseWorkout(workoutId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.PAUSE}/${workoutId}/pause`,
+    );
+  },
+
+  /**
+   * 운동 재개
+   */
+  async resumeWorkout(workoutId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.RESUME}/${workoutId}/resume`,
+    );
+  },
+
+  /**
+   * 운동 취소
+   */
+  async cancelWorkout(workoutId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.WORKOUTS.DETAIL}/${workoutId}`,
+    );
+  },
+
+  /**
+   * 현재 진행 중인 운동 상태 조회
+   */
+  async getCurrentWorkout(): Promise<ApiResponse> {
+    return apiClient.get<ApiResponse>(API_CONFIG.ENDPOINTS.WORKOUTS.CURRENT);
   },
 };
 
