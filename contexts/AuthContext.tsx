@@ -2,10 +2,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import {
   authApi,
   userApi,
@@ -52,23 +55,88 @@ const STORAGE_KEY = "runnerway_user";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const appState = useRef(AppState.currentState);
+
+  // 강제 로그아웃 처리 (토큰 문제 발생 시)
+  const forceLogout = useCallback(async () => {
+    console.log("� 강제 로그아웃 수행");
+    setUser(null);
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      await tokenManager.clearTokens();
+    } catch (error) {
+      console.error("Failed to clear user data:", error);
+    }
+  }, []);
+
+  // 토큰 유효성 검증 (서버에 /users/me 호출로 확인)
+  const verifyToken = useCallback(async () => {
+    try {
+      const token = await tokenManager.getAccessToken();
+      if (!token) {
+        // 토큰이 없으면 로그아웃 상태
+        if (user) {
+          await forceLogout();
+        }
+        return;
+      }
+
+      // 서버에 토큰 유효성 확인
+      const response = await userApi.getMe();
+      if (response.success && response.data) {
+        // 토큰 유효 - 사용자 정보 갱신
+        const userData: User = {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          avatar: response.data.avatar_url,
+          provider: response.data.provider || undefined,
+          stats: {
+            totalDistance: response.data.stats.total_distance,
+            totalWorkouts: response.data.stats.total_workouts,
+            completedRoutes: response.data.stats.completed_routes,
+          },
+        };
+        setUser(userData);
+        await saveUserToStorage(userData);
+      }
+    } catch (error) {
+      console.error("🔐 토큰 검증 실패 - 로그아웃 처리:", error);
+      await forceLogout();
+    }
+  }, [user, forceLogout]);
 
   // 토큰 만료 시 자동 로그아웃 처리
   useEffect(() => {
     const handleUnauthorized = async () => {
-      console.log("🔐 토큰 만료 감지 - 자동 로그아웃 수행");
-      setUser(null);
-      try {
-        await AsyncStorage.removeItem(STORAGE_KEY);
-        await tokenManager.clearTokens();
-      } catch (error) {
-        console.error("Failed to clear user data:", error);
-      }
+      console.log("🔐 토큰 인증 실패 감지 - 자동 로그아웃 수행");
+      await forceLogout();
     };
 
     // API 클라이언트에 콜백 등록
     setUnauthorizedCallback(handleUnauthorized);
-  }, []);
+  }, [forceLogout]);
+
+  // 앱이 포그라운드로 돌아올 때 토큰 검증
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextAppState: AppStateStatus) => {
+        if (
+          appState.current.match(/inactive|background/) &&
+          nextAppState === "active"
+        ) {
+          console.log("📱 앱 포그라운드 복귀 - 토큰 검증 시작");
+          verifyToken();
+        }
+        appState.current = nextAppState;
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [verifyToken]);
 
   const saveUserToStorage = async (userData: User) => {
     try {

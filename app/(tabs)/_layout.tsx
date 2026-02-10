@@ -1,8 +1,24 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Home, Users, User } from "lucide-react-native";
 import { Colors } from "../../constants/theme";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function TabLayout() {
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+
+  // 인증되지 않은 사용자는 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/(auth)/login");
+    }
+  }, [isAuthenticated, loading, router]);
+
+  if (loading || !isAuthenticated) {
+    return null;
+  }
+
   return (
     <Tabs
       screenOptions={{
