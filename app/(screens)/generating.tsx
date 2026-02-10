@@ -112,7 +112,6 @@ export default function GeneratingScreen() {
       const run = async () => {
         try {
           const targetKm = parseFloat(
-            (params.shapeDistance as string)?.replace("km", "") ||
             (params.targetDistanceKm as string) ||
             "5"
           );
