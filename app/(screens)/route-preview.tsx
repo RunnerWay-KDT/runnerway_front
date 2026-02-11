@@ -258,6 +258,13 @@ export default function RoutePreviewScreen() {
     return { lat: sumLat / n, lng: sumLng / n };
   })();
 
+  const startPosition = (() => {
+    const lat = params.startLat != null ? parseFloat(String(params.startLat)) : null;
+    const lng = params.startLng != null ? parseFloat(String(params.startLng)) : null;
+    if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return undefined;
+    return { lat, lng };
+  })();
+
   return (
     <View style={styles.container}>
       {/* Background Map */}
@@ -266,6 +273,7 @@ export default function RoutePreviewScreen() {
         routePath={iconName}
         polyline={mapPolyline}
         center={mapCenter}
+        startPosition={startPosition}
         isLoading={!selectedRoute || optionsLoading}
       />
 
