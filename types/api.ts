@@ -191,6 +191,7 @@ export interface WorkoutSummary {
   calories: number | null;
   route_completion: number | null;
   is_bookmarked: boolean;
+  svg_path: string | null; // 커스텀 경로의 SVG path 데이터
   started_at: string;
   completed_at: string | null;
 }
