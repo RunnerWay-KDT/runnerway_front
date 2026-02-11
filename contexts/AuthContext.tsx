@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /** 사용자 데이터 새로고침 (통계 업데이트 등) */
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -338,7 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to refresh user data:", error);
     }
-  };
+  }, [user]);
 
   const value: AuthContextType = {
     user,
