@@ -37,6 +37,7 @@ import type { SavedRouteSummary } from "../../types/api";
 interface SavedRouteItem {
   id: string; // saved_route id
   routeId: string; // 원본 route id
+  routeOptionId: string | null; // 저장된 route option id
   routeName: string;
   distance: number;
   safetyScore: number;
@@ -57,6 +58,7 @@ function toSavedRouteItem(r: SavedRouteSummary): SavedRouteItem {
   return {
     id: r.id,
     routeId: r.route_id,
+    routeOptionId: r.route_option_id,
     routeName: r.route_name,
     distance: r.distance ?? 0,
     safetyScore: r.safety_score ?? 0,
@@ -211,6 +213,7 @@ export default function SavedRoutesScreen() {
         distance: route.distance.toString(),
         fromSaved: "true",
         routeId: route.routeId,
+        routeOptionId: route.routeOptionId ?? undefined,
         routeName: route.routeName,
       },
     });

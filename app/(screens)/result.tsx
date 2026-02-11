@@ -321,12 +321,6 @@ export default function ResultScreen() {
         <View style={styles.distanceBadge}>
           <Text style={styles.distanceText}>{distance} km</Text>
         </View>
-        {isCustomDrawing && (
-          <View style={styles.customBadge}>
-            <Sparkles size={12} color="#fff" />
-            <Text style={styles.customBadgeText}>커스텀 경로</Text>
-          </View>
-        )}
       </Animated.View>
 
       {/* Stats Grid */}

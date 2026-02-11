@@ -187,7 +187,19 @@ export default function RoutePreviewScreen() {
             : undefined,
         }));
         setFetchedOptions(mapped);
-        const defaultIndex = 0; // 가장 유사도 높은 top1(1순위)를 미리 선택
+
+        // 저장된 routeOptionId가 있으면 해당 옵션을 선택, 없으면 첫 번째 선택
+        const savedRouteOptionId = params.routeOptionId as string | undefined;
+        let defaultIndex = 0;
+        if (savedRouteOptionId) {
+          const savedIndex = mapped.findIndex(
+            (opt) => opt.optionId === savedRouteOptionId,
+          );
+          if (savedIndex !== -1) {
+            defaultIndex = savedIndex;
+          }
+        }
+
         setSelectedRoute(mapped[defaultIndex]);
         setOptionsLoading(false);
       })
@@ -259,9 +271,12 @@ export default function RoutePreviewScreen() {
   })();
 
   const startPosition = (() => {
-    const lat = params.startLat != null ? parseFloat(String(params.startLat)) : null;
-    const lng = params.startLng != null ? parseFloat(String(params.startLng)) : null;
-    if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return undefined;
+    const lat =
+      params.startLat != null ? parseFloat(String(params.startLat)) : null;
+    const lng =
+      params.startLng != null ? parseFloat(String(params.startLng)) : null;
+    if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng))
+      return undefined;
     return { lat, lng };
   })();
 

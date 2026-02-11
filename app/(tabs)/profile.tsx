@@ -34,11 +34,12 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, refreshUserData } = useAuth();
 
-  // 화면에 진입할 때마다 사용자 데이터 새로고침
+  // 화면에 포커스될 때마다 사용자 데이터 새로고침 (1회만 호출)
   useFocusEffect(
     useCallback(() => {
       refreshUserData();
-    }, [refreshUserData]),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
   );
 
   const stats = [

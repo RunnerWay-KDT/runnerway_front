@@ -24,6 +24,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
 import { WorkoutDetailModal } from "../../components/WorkoutDetailModal";
 import {
   BorderRadius,
@@ -48,6 +49,7 @@ interface WorkoutRecord {
   pace: string;
   calories: number;
   isBookmarked: boolean;
+  svgPath: string | null; // 커스텀 경로 SVG path
   routeData: {
     shapeId: string;
     shapeName: string;
@@ -92,6 +94,7 @@ function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
     pace: w.avg_pace ?? "-",
     calories: w.calories ?? 0,
     isBookmarked: w.is_bookmarked ?? false,
+    svgPath: w.svg_path ?? null,
     routeData,
     completedAt: w.completed_at ?? w.started_at,
   };
@@ -313,22 +316,32 @@ export default function WorkoutHistoryScreen() {
             activeOpacity={0.7}
             onPress={() => handleWorkoutPress(item)}
           >
-            {/* 왼쪽: 아이콘 */}
+            {/* 왼쪽: 아이콘 (커스텀 경로면 SVG path 보라색, 프리셋이면 기존 아이콘) */}
             <View
               style={[
                 styles.iconContainer,
                 {
-                  backgroundColor: isRunning
-                    ? `${Colors.emerald[500]}20`
-                    : `${Colors.blue[500]}20`,
+                  backgroundColor: item.svgPath
+                    ? `${Colors.purple[500]}20`
+                    : isRunning
+                      ? `${Colors.emerald[500]}20`
+                      : `${Colors.blue[500]}20`,
                 },
               ]}
             >
-              <RouteIcon
-                size={32}
-                color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
-                strokeWidth={1.5}
-              />
+              {item.svgPath ? (
+                <SvgPathIcon
+                  svgPath={item.svgPath}
+                  size={32}
+                  color={Colors.purple[400]}
+                />
+              ) : (
+                <RouteIcon
+                  size={32}
+                  color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
+                  strokeWidth={1.5}
+                />
+              )}
             </View>
 
             {/* 중앙: 운동 정보 */}

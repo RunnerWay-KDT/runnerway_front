@@ -191,6 +191,7 @@ export interface WorkoutSummary {
   calories: number | null;
   route_completion: number | null;
   is_bookmarked: boolean;
+  svg_path: string | null; // 커스텀 경로의 SVG path 데이터
   started_at: string;
   completed_at: string | null;
 }
@@ -244,6 +245,7 @@ export interface WorkoutDetailResponse {
 export interface SavedRouteSummary {
   id: string;
   route_id: string;
+  route_option_id: string | null; // 저장된 경로 옵션 ID
   route_name: string;
   type: string | null; // preset / custom / none
   mode: string | null; // running / walking / none

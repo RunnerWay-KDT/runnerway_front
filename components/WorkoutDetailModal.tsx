@@ -30,6 +30,7 @@ import {
 } from "../constants/theme";
 import { getIconComponent } from "../utils/shapeIcons";
 import { KakaoMap } from "./KakaoMap";
+import { SvgPathIcon } from "./SvgPathIcon";
 import { workoutApi } from "../utils/api";
 import type { WorkoutDetail } from "../types/api";
 
@@ -46,6 +47,7 @@ interface WorkoutDetailModalProps {
     duration: number;
     pace: string;
     calories: number;
+    svgPath?: string | null;
     routeData: {
       shapeId: string;
       shapeName: string;
@@ -205,17 +207,27 @@ export function WorkoutDetailModal({
                 style={[
                   styles.headerIcon,
                   {
-                    backgroundColor: isRunning
-                      ? `${Colors.emerald[500]}20`
-                      : `${Colors.blue[500]}20`,
+                    backgroundColor: workout.svgPath
+                      ? `${Colors.purple[500]}20`
+                      : isRunning
+                        ? `${Colors.emerald[500]}20`
+                        : `${Colors.blue[500]}20`,
                   },
                 ]}
               >
-                <RouteIcon
-                  size={24}
-                  color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
-                  strokeWidth={1.5}
-                />
+                {workout.svgPath ? (
+                  <SvgPathIcon
+                    svgPath={workout.svgPath}
+                    size={24}
+                    color={Colors.purple[400]}
+                  />
+                ) : (
+                  <RouteIcon
+                    size={24}
+                    color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
+                    strokeWidth={1.5}
+                  />
+                )}
               </View>
               <View style={styles.headerText}>
                 <Text style={styles.headerTitle}>{workout.routeName}</Text>

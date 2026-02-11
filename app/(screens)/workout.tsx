@@ -104,6 +104,7 @@ export default function WorkoutScreen() {
 
   // ============================================
   // 운동 시작 API 호출 → workouts 테이블에 INSERT
+  // (서버에서 기존 활성 운동이 있으면 자동으로 취소 처리)
   // ============================================
   useEffect(() => {
     const startWorkoutSession = async () => {
@@ -116,7 +117,7 @@ export default function WorkoutScreen() {
           accuracy: Location.Accuracy.BestForNavigation,
         });
 
-        const response = await workoutApi.startWorkout({
+        const startWorkoutData = {
           route_id: (params.routeId as string) || null,
           route_option_id: (params.optionId as string) || null,
           route_name:
@@ -130,11 +131,22 @@ export default function WorkoutScreen() {
             longitude: pos.coords.longitude,
           },
           started_at: new Date().toISOString(),
-        });
+        };
+
+        console.log("🚀 운동 시작 API 호출 데이터:", startWorkoutData);
+
+        const response = await workoutApi.startWorkout(startWorkoutData);
+
+        console.log("📥 운동 시작 API 응답:", response);
 
         if (response.success && response.data?.workout_id) {
           setWorkoutId(response.data.workout_id);
           console.log("✅ 운동 시작 (workout_id):", response.data.workout_id);
+        } else {
+          console.warn(
+            "⚠️ 운동 시작 API 응답에 workout_id가 없습니다:",
+            response,
+          );
         }
       } catch (error) {
         console.error("❌ 운동 시작 API 실패:", error);
