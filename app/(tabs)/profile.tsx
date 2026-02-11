@@ -1,9 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bookmark,
   ChevronRight,
-  Heart,
   LogOut,
   MapPin,
   Shield,
@@ -11,7 +10,7 @@ import {
   Trophy,
   User,
 } from "lucide-react-native";
-import React from "react";
+import React, { useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -33,7 +32,14 @@ import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUserData } = useAuth();
+
+  // 화면에 진입할 때마다 사용자 데이터 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserData();
+    }, [refreshUserData]),
+  );
 
   const stats = [
     {
@@ -49,10 +55,10 @@ export default function ProfileScreen() {
       Icon: TrendingUp,
     },
     {
-      label: "완성 경로",
-      value: user?.stats?.completedRoutes || "0",
+      label: "북마크",
+      value: user?.stats?.savedRoutesCount || "0",
       unit: "개",
-      Icon: Heart,
+      Icon: Bookmark,
     },
   ];
 

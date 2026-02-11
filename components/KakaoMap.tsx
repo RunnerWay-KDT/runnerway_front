@@ -26,6 +26,18 @@ interface KakaoMapProps {
     lat: number;
     lng: number;
   }[];
+  /** 계획 경로 (route_options.coordinates) - 회색 점선으로 표시 */
+  plannedPath?: {
+    lat: number;
+    lng: number;
+  }[];
+  /** 실제 이동 경로 (workouts.actual_path) - 에메랄드 실선으로 표시 */
+  actualPath?: {
+    lat: number;
+    lng: number;
+  }[];
+  /** 로딩 상태 - true면 프리셋 경로를 표시하지 않음 */
+  isLoading?: boolean;
 }
 
 export function KakaoMap({
@@ -34,9 +46,12 @@ export function KakaoMap({
   center = { lat: 37.5007, lng: 127.0364 },
   markers = [],
   polyline = [],
+  plannedPath = [],
+  actualPath = [],
+  isLoading = false,
 }: KakaoMapProps) {
   const webViewRef = useRef<WebView>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [webViewLoading, setWebViewLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   // 경로에 따른 샘플 폴리라인 데이터 생성
@@ -89,8 +104,29 @@ export function KakaoMap({
     }
   };
 
+  // 로딩 중이면 프리셋 경로를 생성하지 않음
   const routePolyline =
-    polyline.length > 0 ? polyline : getRoutePolyline(routePath);
+    polyline.length > 0
+      ? polyline
+      : isLoading
+        ? [] // 로딩 중이면 빈 배열
+        : routePath
+          ? getRoutePolyline(routePath)
+          : []; // routePath가 없으면 빈 배열
+
+  // 경로 비교 모드인지 확인 (plannedPath 또는 actualPath가 있으면)
+  const isComparisonMode = plannedPath.length > 0 || actualPath.length > 0;
+
+  // 비교 모드에서 지도 중심 계산
+  const comparisonCenter = (() => {
+    const allPoints = [...plannedPath, ...actualPath];
+    if (allPoints.length === 0) return center;
+    const avgLat = allPoints.reduce((s, p) => s + p.lat, 0) / allPoints.length;
+    const avgLng = allPoints.reduce((s, p) => s + p.lng, 0) / allPoints.length;
+    return { lat: avgLat, lng: avgLng };
+  })();
+
+  const mapCenter = isComparisonMode ? comparisonCenter : center;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -158,7 +194,7 @@ export function KakaoMap({
         }
 
         var options = {
-          center: new kakao.maps.LatLng(${center.lat}, ${center.lng}),
+          center: new kakao.maps.LatLng(${mapCenter.lat}, ${mapCenter.lng}),
           level: ${KAKAO_MAP_CONFIG.DEFAULT_LEVEL}
         };
 
@@ -195,6 +231,111 @@ export function KakaoMap({
 
         // 경로 폴리라인 추가
         try {
+          var bounds = new kakao.maps.LatLngBounds();
+
+          ${
+            isComparisonMode
+              ? `
+          // ===== 경로 비교 모드 =====
+          
+          // 1) 계획 경로 (회색 점선)
+          ${
+            plannedPath.length > 0
+              ? `
+          var plannedLinePath = [
+            ${plannedPath
+              .map(
+                (point) => `new kakao.maps.LatLng(${point.lat}, ${point.lng})`,
+              )
+              .join(",\n            ")}
+          ];
+          
+          if (plannedLinePath.length > 0) {
+            var plannedPolyline = new kakao.maps.Polyline({
+              path: plannedLinePath,
+              strokeWeight: 4,
+              strokeColor: '#a1a1aa',
+              strokeOpacity: 0.7,
+              strokeStyle: 'shortdash'
+            });
+            plannedPolyline.setMap(map);
+            plannedLinePath.forEach(function(point) { bounds.extend(point); });
+            sendLog('info', 'Planned path added with ' + plannedLinePath.length + ' points');
+            
+            // 시작점 마커 (계획 경로)
+            var plannedStartDiv = document.createElement('div');
+            plannedStartDiv.style.cssText = 'width:24px;height:24px;background:#a1a1aa;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:11px;';
+            plannedStartDiv.innerText = 'P';
+            var plannedStartOverlay = new kakao.maps.CustomOverlay({
+              position: plannedLinePath[0],
+              content: plannedStartDiv,
+              yAnchor: 0.5
+            });
+            plannedStartOverlay.setMap(map);
+          }
+          `
+              : ""
+          }
+          
+          // 2) 실제 경로 (에메랄드 실선)
+          ${
+            actualPath.length > 0
+              ? `
+          var actualLinePath = [
+            ${actualPath
+              .map(
+                (point) => `new kakao.maps.LatLng(${point.lat}, ${point.lng})`,
+              )
+              .join(",\n            ")}
+          ];
+          
+          if (actualLinePath.length > 0) {
+            var actualPolyline = new kakao.maps.Polyline({
+              path: actualLinePath,
+              strokeWeight: 5,
+              strokeColor: '#34d399',
+              strokeOpacity: 0.9,
+              strokeStyle: 'solid'
+            });
+            actualPolyline.setMap(map);
+            actualLinePath.forEach(function(point) { bounds.extend(point); });
+            sendLog('info', 'Actual path added with ' + actualLinePath.length + ' points');
+            
+            // 시작점 마커 (실제 경로)
+            var actualStartDiv = document.createElement('div');
+            actualStartDiv.style.cssText = 'width:28px;height:28px;background:#10b981;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+            actualStartDiv.innerText = 'S';
+            var actualStartOverlay = new kakao.maps.CustomOverlay({
+              position: actualLinePath[0],
+              content: actualStartDiv,
+              yAnchor: 0.5
+            });
+            actualStartOverlay.setMap(map);
+            
+            // 끝점 마커 (실제 경로)
+            var actualEndDiv = document.createElement('div');
+            actualEndDiv.style.cssText = 'width:28px;height:28px;background:#f43f5e;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+            actualEndDiv.innerText = 'E';
+            var actualEndOverlay = new kakao.maps.CustomOverlay({
+              position: actualLinePath[actualLinePath.length - 1],
+              content: actualEndDiv,
+              yAnchor: 0.5
+            });
+            actualEndOverlay.setMap(map);
+          }
+          `
+              : ""
+          }
+          
+          // 모든 경로에 맞게 지도 범위 조정
+          map.setBounds(bounds);
+          setTimeout(function() {
+            var level = map.getLevel();
+            if (level > 1) map.setLevel(level + 1);
+          }, 100);
+          `
+              : `
+          // ===== 기본 단일 경로 모드 =====
           var linePath = [
             ${routePolyline
               .map(
@@ -227,7 +368,6 @@ export function KakaoMap({
             startOverlay.setMap(map);
 
             // 경로에 맞게 지도 범위 조정
-            var bounds = new kakao.maps.LatLngBounds();
             linePath.forEach(function(point) {
               bounds.extend(point);
             });
@@ -238,6 +378,8 @@ export function KakaoMap({
               var level = map.getLevel();
               map.setLevel(level + 1);
             }, 100);
+          }
+          `
           }
         } catch(e) {
           sendLog('error', 'Polyline error: ' + e.message);
@@ -274,13 +416,13 @@ export function KakaoMap({
         mixedContentMode="always"
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
+        onLoadStart={() => setWebViewLoading(true)}
+        onLoadEnd={() => setWebViewLoading(false)}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.error("WebView error:", nativeEvent);
           setHasError(true);
-          setIsLoading(false);
+          setWebViewLoading(false);
         }}
         onMessage={(event) => {
           try {
