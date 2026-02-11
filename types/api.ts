@@ -244,6 +244,7 @@ export interface WorkoutDetailResponse {
 export interface SavedRouteSummary {
   id: string;
   route_id: string;
+  route_option_id: string | null; // 저장된 경로 옵션 ID
   route_name: string;
   type: string | null; // preset / custom / none
   mode: string | null; // running / walking / none
