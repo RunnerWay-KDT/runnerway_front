@@ -36,6 +36,8 @@ interface KakaoMapProps {
     lat: number;
     lng: number;
   }[];
+  /** 로딩 상태 - true면 프리셋 경로를 표시하지 않음 */
+  isLoading?: boolean;
 }
 
 export function KakaoMap({
@@ -46,9 +48,10 @@ export function KakaoMap({
   polyline = [],
   plannedPath = [],
   actualPath = [],
+  isLoading = false,
 }: KakaoMapProps) {
   const webViewRef = useRef<WebView>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [webViewLoading, setWebViewLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   // 경로에 따른 샘플 폴리라인 데이터 생성
@@ -101,8 +104,15 @@ export function KakaoMap({
     }
   };
 
+  // 로딩 중이면 프리셋 경로를 생성하지 않음
   const routePolyline =
-    polyline.length > 0 ? polyline : getRoutePolyline(routePath);
+    polyline.length > 0
+      ? polyline
+      : isLoading
+        ? [] // 로딩 중이면 빈 배열
+        : routePath
+          ? getRoutePolyline(routePath)
+          : []; // routePath가 없으면 빈 배열
 
   // 경로 비교 모드인지 확인 (plannedPath 또는 actualPath가 있으면)
   const isComparisonMode = plannedPath.length > 0 || actualPath.length > 0;
@@ -406,13 +416,13 @@ export function KakaoMap({
         mixedContentMode="always"
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => setIsLoading(false)}
+        onLoadStart={() => setWebViewLoading(true)}
+        onLoadEnd={() => setWebViewLoading(false)}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.error("WebView error:", nativeEvent);
           setHasError(true);
-          setIsLoading(false);
+          setWebViewLoading(false);
         }}
         onMessage={(event) => {
           try {

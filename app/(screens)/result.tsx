@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  Bookmark,
   Clock,
-  Download,
   Flame,
   Share2,
   Sparkles,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,7 +27,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { workoutApi } from "../../utils/api";
+import { workoutApi, savedRouteApi } from "../../utils/api";
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -43,6 +44,8 @@ export default function ResultScreen() {
 
   // workout.tsx에서 전달받은 데이터
   const workoutId = (params.workoutId as string) || "";
+  const routeId = (params.routeId as string) || "";
+  const routeOptionId = (params.optionId as string) || "";
   const actualPathRaw = (params.actualPath as string) || "[]";
   const splitsDataRaw = (params.splitsData as string) || "[]";
   const endLatitude = (params.endLatitude as string) || "";
@@ -51,6 +54,9 @@ export default function ResultScreen() {
 
   // workout.tsx에서 전달받은 planned path (routePolyline 파라미터)
   const routePolylineRaw = (params.routePolyline as string) || "[]";
+
+  // 북마크 상태
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   // 경로 비교를 위한 state
   const [plannedPath, setPlannedPath] = useState<
@@ -221,6 +227,32 @@ export default function ResultScreen() {
     router.replace("/(tabs)");
   };
 
+  /** 북마크 토글 */
+  const handleToggleBookmark = async () => {
+    if (!routeId) {
+      Alert.alert("알림", "경로 정보가 없어 북마크할 수 없습니다.");
+      return;
+    }
+
+    const wasBookmarked = isBookmarked;
+    setIsBookmarked(!wasBookmarked);
+
+    try {
+      if (wasBookmarked) {
+        await savedRouteApi.unsaveRoute(routeId);
+        Alert.alert("알림", "북마크가 해제되었습니다.");
+      } else {
+        await savedRouteApi.saveRoute(routeId, routeOptionId || undefined);
+        Alert.alert("성공", "경로가 북마크되었습니다!");
+      }
+    } catch (error) {
+      // 실패 시 롤백
+      setIsBookmarked(wasBookmarked);
+      console.error("북마크 토글 실패:", error);
+      Alert.alert("오류", "북마크 변경에 실패했습니다. 다시 시도해주세요.");
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Trophy Header */}
@@ -364,9 +396,31 @@ export default function ResultScreen() {
             <Share2 size={20} color={Colors.zinc[50]} />
             <Text style={styles.iconButtonText}>공유</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-            <Download size={20} color={Colors.zinc[50]} />
-            <Text style={styles.iconButtonText}>저장</Text>
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            onPress={handleToggleBookmark}
+            disabled={!routeId}
+          >
+            <Bookmark
+              size={20}
+              color={
+                !routeId
+                  ? Colors.zinc[600]
+                  : isBookmarked
+                    ? Colors.emerald[400]
+                    : Colors.zinc[50]
+              }
+              fill={isBookmarked ? Colors.emerald[400] : "transparent"}
+            />
+            <Text
+              style={[
+                styles.iconButtonText,
+                !routeId && { color: Colors.zinc[600] },
+              ]}
+            >
+              저장
+            </Text>
           </TouchableOpacity>
         </Animated.View>
 

@@ -744,9 +744,13 @@ export const savedRouteApi = {
   /**
    * 경로 저장 (북마크) → POST /api/v1/routes/{route_id}/save
    */
-  async saveRoute(routeId: string): Promise<ApiResponse> {
+  async saveRoute(
+    routeId: string,
+    routeOptionId?: string,
+  ): Promise<ApiResponse> {
     return apiClient.post<ApiResponse>(
       `${API_CONFIG.ENDPOINTS.SAVED_ROUTES.SAVE}/${routeId}/save`,
+      routeOptionId ? { route_option_id: routeOptionId } : undefined,
     );
   },
 

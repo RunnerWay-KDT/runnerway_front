@@ -40,6 +40,7 @@ import type { WorkoutSummary } from "../../types/api";
 interface WorkoutRecord {
   id: string;
   routeId: string | null;
+  routeOptionId: string | null;
   routeName: string;
   type: "running" | "walking";
   distance: number;
@@ -81,6 +82,7 @@ function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
   return {
     id: w.id,
     routeId: w.route_id ?? null,
+    routeOptionId: w.route_option_id ?? null,
     routeName: w.route_name,
     type: (w.mode === "walking" ? "walking" : "running") as
       | "running"
@@ -212,7 +214,10 @@ export default function WorkoutHistoryScreen() {
       if (wasBookmarked) {
         await savedRouteApi.unsaveRoute(workout.routeId);
       } else {
-        await savedRouteApi.saveRoute(workout.routeId);
+        await savedRouteApi.saveRoute(
+          workout.routeId,
+          workout.routeOptionId ?? undefined,
+        );
       }
     } catch (error) {
       // 실패 시 롤백

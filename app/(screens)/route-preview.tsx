@@ -43,7 +43,7 @@ interface RouteOption {
   convenience: number;
   difficulty: string;
   tag: string | null;
-  // 경로 옵션 ID 
+  // 경로 옵션 ID
   optionId?: string;
   // 실제 경로 좌표
   coordinates?: { lat: number; lng: number }[];
@@ -116,14 +116,19 @@ export default function RoutePreviewScreen() {
   };
 
   const fallbackOptions = generateRouteOptions();
-  const [fetchedOptions, setFetchedOptions] = useState<RouteOption[] | null>(null);
-  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [fetchedOptions, setFetchedOptions] = useState<RouteOption[] | null>(
+    null,
+  );
+  const [optionsLoading, setOptionsLoading] = useState(!!params.routeId);
   const [optionsError, setOptionsError] = useState<string | null>(null);
 
-  const routeOptions = fetchedOptions ?? fallbackOptions;
-  const [selectedRoute, setSelectedRoute] = useState(routeOptions[1]);
-
   const routeId = params.routeId as string | undefined;
+
+  // routeId가 있으면(저장 경로에서 진입) API 로드 전에 목업을 보여주지 않는다
+  const routeOptions = fetchedOptions ?? (routeId ? [] : fallbackOptions);
+  const [selectedRoute, setSelectedRoute] = useState<RouteOption | null>(
+    routeId ? null : fallbackOptions[1],
+  );
 
   useEffect(() => {
     if (!routeId) {
@@ -136,17 +141,23 @@ export default function RoutePreviewScreen() {
     routeApi
       .getRouteOptions(routeId)
       .then((res: unknown) => {
-        const data = (res as { data?: { options?: Array<{
-          id: string;
-          option_number: number;
-          name: string;
-          distance: number;
-          estimated_time: number;
-          difficulty: string;
-          tag: string | null;
-          coordinates: Array<{ lat: number; lng: number}>;
-          scores?: { safety?: number; elevation?: number; }
-        }>}})?.data;
+        const data = (
+          res as {
+            data?: {
+              options?: Array<{
+                id: string;
+                option_number: number;
+                name: string;
+                distance: number;
+                estimated_time: number;
+                difficulty: string;
+                tag: string | null;
+                coordinates: Array<{ lat: number; lng: number }>;
+                scores?: { safety?: number; elevation?: number };
+              }>;
+            };
+          }
+        )?.data;
         if (cancelled) return;
         const options = data?.options ?? [];
         if (options.length === 0) {
@@ -169,9 +180,12 @@ export default function RoutePreviewScreen() {
           tag: opt.tag ?? null,
           optionId: opt.id,
           coordinates: Array.isArray(opt.coordinates)
-            ? opt.coordinates.map((c) => ({ lat: Number(c.lat), lng: Number(c.lng) }))
+            ? opt.coordinates.map((c) => ({
+                lat: Number(c.lat),
+                lng: Number(c.lng),
+              }))
             : undefined,
-        }))
+        }));
         setFetchedOptions(mapped);
         const defaultIndex = 0; // 가장 유사도 높은 top1(1순위)를 미리 선택
         setSelectedRoute(mapped[defaultIndex]);
@@ -179,32 +193,37 @@ export default function RoutePreviewScreen() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setOptionsError((err as Error)?.message ?? "경로 옵션을 불러오지 못했습니다.");
+          setOptionsError(
+            (err as Error)?.message ?? "경로 옵션을 불러오지 못했습니다.",
+          );
           setFetchedOptions(null);
           setSelectedRoute(fallbackOptions[1]);
           setOptionsLoading(false);
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [routeId]);
 
   const RouteIcon = getIconComponent(iconName);
 
   // workout으로 선택한 경로 좌표 넘기기 (실제 경로 좌표가 있으면 그것을 넘기고, 없으면 프리셋 경로 좌표를 넘김)
   const handleStart = () => {
+    if (!selectedRoute) return;
     router.push({
       pathname: "/(screens)/workout",
       params: {
         ...params,
         ...(routeId && selectedRoute.optionId
           ? { routeId, optionId: selectedRoute.optionId }
-          : { }),
+          : {}),
         selectedRouteId: selectedRoute.id.toString(),
         targetDistance: parseFloat(selectedRoute.distance).toString(),
         routeName: selectedRoute.name,
         ...(selectedRoute.coordinates && selectedRoute.coordinates.length > 0
-          ? { routePolyline: JSON.stringify(selectedRoute.coordinates)}
-          : { }),
+          ? { routePolyline: JSON.stringify(selectedRoute.coordinates) }
+          : {}),
       },
     });
   };
@@ -212,23 +231,24 @@ export default function RoutePreviewScreen() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "쉬움":
-      case '짧은 코스':
+      case "짧은 코스":
         return { text: Colors.emerald[400], bg: `${Colors.emerald[500]}20` };
       case "보통":
         return { text: Colors.blue[400], bg: `${Colors.blue[500]}20` };
       case "도전":
-      case '긴 코스':
+      case "긴 코스":
         return { text: Colors.orange[400], bg: `${Colors.orange[500]}20` };
       default:
         return { text: Colors.zinc[400], bg: `${Colors.zinc[500]}20` };
     }
   };
 
-  // 실제 경로가 있으면 polyline+center 전달 
+  // 실제 경로가 있으면 polyline+center 전달
   // → KakaoMap이 setBounds로 전체 경로가 보이게 함
-  const mapPolyline = selectedRoute.coordinates && selectedRoute.coordinates.length > 0
-  ? selectedRoute.coordinates
-  : [];
+  const mapPolyline =
+    selectedRoute?.coordinates && selectedRoute.coordinates.length > 0
+      ? selectedRoute.coordinates
+      : [];
   // 경로 전체의 기하학적 중심(무게 중심). 인덱스 중간이 아니라 모든 좌표 평균
   const mapCenter = (() => {
     if (mapPolyline.length === 0) return undefined;
@@ -242,10 +262,11 @@ export default function RoutePreviewScreen() {
     <View style={styles.container}>
       {/* Background Map */}
       <KakaoMap
-        key={mapPolyline.length > 0 ? 'path' : 'preset'} 
-        routePath={iconName} 
-        polyline={mapPolyline} 
-        center={mapCenter} 
+        key={mapPolyline.length > 0 ? "path" : "preset"}
+        routePath={iconName}
+        polyline={mapPolyline}
+        center={mapCenter}
+        isLoading={!selectedRoute || optionsLoading}
       />
 
       {/* Header */}
@@ -265,265 +286,279 @@ export default function RoutePreviewScreen() {
 
       {/* Bottom Sheet */}
       <BottomSheet onStateChange={setSheetState}>
-        {/* Selected Route Info */}
-        <Animated.View entering={FadeInUp.duration(300)}>
-          <View style={styles.routeHeader}>
-            <View
-              style={[
-                styles.routeIconContainer,
-                {
-                  backgroundColor: isCustomDrawing
-                    ? `${Colors.purple[500]}20`
-                    : `${Colors.emerald[500]}20`,
-                },
-              ]}
-            >
-              {isCustomDrawing ? (
-                <Sparkles size={24} color={Colors.purple[400]} />
-              ) : (
-                <RouteIcon size={24} color={Colors.emerald[400]} />
-              )}
-            </View>
-            <View style={styles.routeInfo}>
-              <View style={styles.routeNameRow}>
-                <Text style={styles.routeName}>{selectedRoute.name}</Text>
-                {selectedRoute.tag && (
-                  <View
-                    style={[
-                      styles.routeTag,
-                      {
-                        backgroundColor:
-                          selectedRoute.tag === "BEST"
-                            ? `${Colors.emerald[500]}20`
-                            : `${Colors.blue[500]}20`,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.routeTagText,
-                        {
-                          color:
-                            selectedRoute.tag === "BEST"
-                              ? Colors.emerald[400]
-                              : Colors.blue[400],
-                        },
-                      ]}
-                    >
-                      {selectedRoute.tag}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.routeLocation}>현재 위치 주변</Text>
-            </View>
+        {/* 로딩 중이거나 선택된 경로가 아직 없으면 로딩 표시 */}
+        {!selectedRoute || optionsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.emerald[400]} />
+            <Text style={styles.loadingText}>경로를 불러오는 중...</Text>
           </View>
-
-          {/* Stats Grid */}
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <MapPin size={20} color={Colors.emerald[400]} />
-              <Text style={styles.statValue}>
-                {selectedRoute.distance.replace("km", "")}
-              </Text>
-              <Text style={styles.statLabel}>km</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Clock size={20} color={Colors.blue[400]} />
-              <Text style={styles.statValue}>
-                {selectedRoute.estimatedTime}
-              </Text>
-              <Text style={styles.statLabel}>분</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Shield size={20} color={Colors.purple[400]} />
-              <Text style={styles.statValue}>{selectedRoute.safety}</Text>
-              <Text style={styles.statLabel}>점</Text>
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Route Options */}
-        {(sheetState === "half" || sheetState === "expanded") && (
-          <Animated.View entering={FadeInUp.delay(100).duration(300)}>
-            <View style={styles.divider} />
-
-            <View style={styles.sectionHeader}>
-              <TrendingUp size={16} color={Colors.emerald[400]} />
-              <Text style={styles.sectionTitle}>다른 경로 옵션</Text>
-            </View>
-
-            {routeOptions.map((route) => {
-              const difficultyStyle = getDifficultyColor(route.difficulty);
-              const isSelected = selectedRoute.id === route.id;
-
-              return (
-                <TouchableOpacity
-                  key={route.id}
-                  onPress={() => setSelectedRoute(route)}
+        ) : (
+          <>
+            {/* Selected Route Info */}
+            <Animated.View entering={FadeInUp.duration(300)}>
+              <View style={styles.routeHeader}>
+                <View
                   style={[
-                    styles.routeOption,
-                    isSelected && styles.routeOptionSelected,
+                    styles.routeIconContainer,
+                    {
+                      backgroundColor: isCustomDrawing
+                        ? `${Colors.purple[500]}20`
+                        : `${Colors.emerald[500]}20`,
+                    },
                   ]}
-                  activeOpacity={0.7}
                 >
-                  <View style={styles.routeOptionContent}>
-                    <View style={styles.routeOptionHeader}>
-                      <Text style={styles.routeOptionName}>{route.name}</Text>
-                      {route.tag && (
-                        <View
-                          style={[
-                            styles.routeTag,
-                            {
-                              backgroundColor:
-                                route.tag === "BEST"
-                                  ? `${Colors.emerald[500]}20`
-                                  : `${Colors.blue[500]}20`,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.routeTagText,
-                              {
-                                color:
-                                  route.tag === "BEST"
-                                    ? Colors.emerald[400]
-                                    : Colors.blue[400],
-                              },
-                            ]}
-                          >
-                            {route.tag}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.routeOptionMeta}>
-                      <Text style={styles.routeOptionMetaText}>
-                        {route.distance}
-                      </Text>
-                      <Text style={styles.routeOptionMetaDot}>•</Text>
-                      <Text style={styles.routeOptionMetaText}>
-                        {route.estimatedTime}분
-                      </Text>
-                      <Text style={styles.routeOptionMetaDot}>•</Text>
+                  {isCustomDrawing ? (
+                    <Sparkles size={24} color={Colors.purple[400]} />
+                  ) : (
+                    <RouteIcon size={24} color={Colors.emerald[400]} />
+                  )}
+                </View>
+                <View style={styles.routeInfo}>
+                  <View style={styles.routeNameRow}>
+                    <Text style={styles.routeName}>{selectedRoute.name}</Text>
+                    {selectedRoute.tag && (
                       <View
                         style={[
-                          styles.difficultyBadge,
-                          { backgroundColor: difficultyStyle.bg },
+                          styles.routeTag,
+                          {
+                            backgroundColor:
+                              selectedRoute.tag === "BEST"
+                                ? `${Colors.emerald[500]}20`
+                                : `${Colors.blue[500]}20`,
+                          },
                         ]}
                       >
                         <Text
                           style={[
-                            styles.difficultyText,
-                            { color: difficultyStyle.text },
+                            styles.routeTagText,
+                            {
+                              color:
+                                selectedRoute.tag === "BEST"
+                                  ? Colors.emerald[400]
+                                  : Colors.blue[400],
+                            },
                           ]}
                         >
-                          {route.difficulty}
+                          {selectedRoute.tag}
                         </Text>
                       </View>
-                    </View>
-                    <View style={styles.routeOptionStats}>
-                      <View style={styles.routeOptionStat}>
-                        <Shield size={12} color={Colors.purple[400]} />
-                        <Text style={styles.routeOptionStatText}>
-                          안전도 {route.safety}점
-                        </Text>
-                      </View>
-                    </View>
+                    )}
                   </View>
-                  {isSelected && (
-                    <Animated.View
-                      entering={ZoomIn.duration(200)}
-                      style={styles.checkMark}
+                  <Text style={styles.routeLocation}>현재 위치 주변</Text>
+                </View>
+              </View>
+
+              {/* Stats Grid */}
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
+                  <MapPin size={20} color={Colors.emerald[400]} />
+                  <Text style={styles.statValue}>
+                    {selectedRoute.distance.replace("km", "")}
+                  </Text>
+                  <Text style={styles.statLabel}>km</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Clock size={20} color={Colors.blue[400]} />
+                  <Text style={styles.statValue}>
+                    {selectedRoute.estimatedTime}
+                  </Text>
+                  <Text style={styles.statLabel}>분</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Shield size={20} color={Colors.purple[400]} />
+                  <Text style={styles.statValue}>{selectedRoute.safety}</Text>
+                  <Text style={styles.statLabel}>점</Text>
+                </View>
+              </View>
+            </Animated.View>
+
+            {/* Route Options */}
+            {(sheetState === "half" || sheetState === "expanded") && (
+              <Animated.View entering={FadeInUp.delay(100).duration(300)}>
+                <View style={styles.divider} />
+
+                <View style={styles.sectionHeader}>
+                  <TrendingUp size={16} color={Colors.emerald[400]} />
+                  <Text style={styles.sectionTitle}>다른 경로 옵션</Text>
+                </View>
+
+                {routeOptions.map((route) => {
+                  const difficultyStyle = getDifficultyColor(route.difficulty);
+                  const isSelected = selectedRoute.id === route.id;
+
+                  return (
+                    <TouchableOpacity
+                      key={route.id}
+                      onPress={() => setSelectedRoute(route)}
+                      style={[
+                        styles.routeOption,
+                        isSelected && styles.routeOptionSelected,
+                      ]}
+                      activeOpacity={0.7}
                     >
-                      <Check size={16} color="#fff" />
-                    </Animated.View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+                      <View style={styles.routeOptionContent}>
+                        <View style={styles.routeOptionHeader}>
+                          <Text style={styles.routeOptionName}>
+                            {route.name}
+                          </Text>
+                          {route.tag && (
+                            <View
+                              style={[
+                                styles.routeTag,
+                                {
+                                  backgroundColor:
+                                    route.tag === "BEST"
+                                      ? `${Colors.emerald[500]}20`
+                                      : `${Colors.blue[500]}20`,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.routeTagText,
+                                  {
+                                    color:
+                                      route.tag === "BEST"
+                                        ? Colors.emerald[400]
+                                        : Colors.blue[400],
+                                  },
+                                ]}
+                              >
+                                {route.tag}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.routeOptionMeta}>
+                          <Text style={styles.routeOptionMetaText}>
+                            {route.distance}
+                          </Text>
+                          <Text style={styles.routeOptionMetaDot}>•</Text>
+                          <Text style={styles.routeOptionMetaText}>
+                            {route.estimatedTime}분
+                          </Text>
+                          <Text style={styles.routeOptionMetaDot}>•</Text>
+                          <View
+                            style={[
+                              styles.difficultyBadge,
+                              { backgroundColor: difficultyStyle.bg },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.difficultyText,
+                                { color: difficultyStyle.text },
+                              ]}
+                            >
+                              {route.difficulty}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.routeOptionStats}>
+                          <View style={styles.routeOptionStat}>
+                            <Shield size={12} color={Colors.purple[400]} />
+                            <Text style={styles.routeOptionStatText}>
+                              안전도 {route.safety}점
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      {isSelected && (
+                        <Animated.View
+                          entering={ZoomIn.duration(200)}
+                          style={styles.checkMark}
+                        >
+                          <Check size={16} color="#fff" />
+                        </Animated.View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
 
-            {/* Route Features */}
-            <View style={styles.sectionHeader}>
-              <Navigation size={16} color={Colors.emerald[400]} />
-              <Text style={styles.sectionTitle}>선택된 경로 특징</Text>
+                {/* Route Features */}
+                <View style={styles.sectionHeader}>
+                  <Navigation size={16} color={Colors.emerald[400]} />
+                  <Text style={styles.sectionTitle}>선택된 경로 특징</Text>
+                </View>
+
+                <View style={styles.featureList}>
+                  <View style={styles.featureItem}>
+                    <View
+                      style={[
+                        styles.featureDot,
+                        { backgroundColor: Colors.emerald[400] },
+                      ]}
+                    />
+                    <Text style={styles.featureText}>
+                      평탄한 코스 (고도차 {selectedRoute.elevation}m)
+                    </Text>
+                  </View>
+                  <View style={styles.featureItem}>
+                    <View
+                      style={[
+                        styles.featureDot,
+                        { backgroundColor: Colors.blue[400] },
+                      ]}
+                    />
+                    <Text style={styles.featureText}>
+                      가로등 밝음 ({selectedRoute.lighting}% 조명)
+                    </Text>
+                  </View>
+                </View>
+
+                {/* 주변 편의시설 - half 상태에서도 보이도록 수정 */}
+                <View style={styles.divider} />
+
+                <View style={styles.sectionHeader}>
+                  <Store size={16} color={Colors.amber[400]} />
+                  <Text style={styles.sectionTitle}>주변 편의시설</Text>
+                </View>
+
+                <View style={styles.facilityGrid}>
+                  <View style={styles.facilityCard}>
+                    <Text style={styles.facilityLabel}>편의점</Text>
+                    <Text style={styles.facilityValue}>
+                      {selectedRoute.convenience}곳
+                    </Text>
+                  </View>
+                  <View style={styles.facilityCard}>
+                    <Text style={styles.facilityLabel}>화장실</Text>
+                    <Text style={styles.facilityValue}>
+                      {Math.ceil(selectedRoute.convenience / 2)}곳
+                    </Text>
+                  </View>
+                  <View style={styles.facilityCard}>
+                    <Text style={styles.facilityLabel}>음수대</Text>
+                    <Text style={styles.facilityValue}>
+                      {selectedRoute.convenience + 2}곳
+                    </Text>
+                  </View>
+                  <View style={styles.facilityCard}>
+                    <Text style={styles.facilityLabel}>CCTV</Text>
+                    <Text style={styles.facilityValue}>
+                      {Math.round(selectedRoute.safety / 5)}대
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.actionContainer}>
+              <PrimaryButton onPress={handleStart}>
+                이 경로로 운동 시작
+              </PrimaryButton>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  다른 경로 생성하기
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <View style={styles.featureList}>
-              <View style={styles.featureItem}>
-                <View
-                  style={[
-                    styles.featureDot,
-                    { backgroundColor: Colors.emerald[400] },
-                  ]}
-                />
-                <Text style={styles.featureText}>
-                  평탄한 코스 (고도차 {selectedRoute.elevation}m)
-                </Text>
-              </View>
-              <View style={styles.featureItem}>
-                <View
-                  style={[
-                    styles.featureDot,
-                    { backgroundColor: Colors.blue[400] },
-                  ]}
-                />
-                <Text style={styles.featureText}>
-                  가로등 밝음 ({selectedRoute.lighting}% 조명)
-                </Text>
-              </View>
-            </View>
-
-            {/* 주변 편의시설 - half 상태에서도 보이도록 수정 */}
-            <View style={styles.divider} />
-
-            <View style={styles.sectionHeader}>
-              <Store size={16} color={Colors.amber[400]} />
-              <Text style={styles.sectionTitle}>주변 편의시설</Text>
-            </View>
-
-            <View style={styles.facilityGrid}>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityLabel}>편의점</Text>
-                <Text style={styles.facilityValue}>
-                  {selectedRoute.convenience}곳
-                </Text>
-              </View>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityLabel}>화장실</Text>
-                <Text style={styles.facilityValue}>
-                  {Math.ceil(selectedRoute.convenience / 2)}곳
-                </Text>
-              </View>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityLabel}>음수대</Text>
-                <Text style={styles.facilityValue}>
-                  {selectedRoute.convenience + 2}곳
-                </Text>
-              </View>
-              <View style={styles.facilityCard}>
-                <Text style={styles.facilityLabel}>CCTV</Text>
-                <Text style={styles.facilityValue}>
-                  {Math.round(selectedRoute.safety / 5)}대
-                </Text>
-              </View>
-            </View>
-          </Animated.View>
+          </>
         )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionContainer}>
-          <PrimaryButton onPress={handleStart}>
-            이 경로로 운동 시작
-          </PrimaryButton>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>다른 경로 생성하기</Text>
-          </TouchableOpacity>
-        </View>
       </BottomSheet>
     </View>
   );
@@ -533,6 +568,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.zinc[950],
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.xl * 2,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.md,
+  },
+  loadingText: {
+    fontSize: FontSize.base,
+    color: Colors.zinc[400],
+    marginTop: Spacing.sm,
   },
   header: {
     position: "absolute",

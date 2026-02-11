@@ -37,7 +37,7 @@ export interface TokenData {
 export interface UserStats {
   total_distance: number;
   total_workouts: number;
-  completed_routes: number;
+  saved_routes_count: number;
 }
 
 export interface UserData {
@@ -181,6 +181,7 @@ export interface WorkoutCompleteResponse {
 export interface WorkoutSummary {
   id: string;
   route_id: string | null;
+  route_option_id: string | null;
   route_name: string;
   type: string | null; // preset / custom / null
   mode: string | null; // running / walking / null
