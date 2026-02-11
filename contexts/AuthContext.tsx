@@ -19,7 +19,7 @@ import {
 interface UserStats {
   totalDistance: number;
   totalWorkouts: number;
-  completedRoutes: number;
+  savedRoutesCount: number;
 }
 
 interface User {
@@ -45,6 +45,7 @@ interface AuthContextType {
     name?: string;
     avatar?: string | null;
   }) => Promise<void>;
+  refreshUserData: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           stats: {
             totalDistance: response.data.stats.total_distance,
             totalWorkouts: response.data.stats.total_workouts,
-            completedRoutes: response.data.stats.completed_routes,
+            savedRoutesCount: response.data.stats.saved_routes_count,
           },
         };
         setUser(userData);
@@ -167,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 stats: {
                   totalDistance: response.data.stats.total_distance,
                   totalWorkouts: response.data.stats.total_workouts,
-                  completedRoutes: response.data.stats.completed_routes,
+                  savedRoutesCount: response.data.stats.saved_routes_count,
                 },
               };
               setUser(userData);
@@ -210,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           stats: {
             totalDistance: response.data.user.stats.total_distance,
             totalWorkouts: response.data.user.stats.total_workouts,
-            completedRoutes: response.data.user.stats.completed_routes,
+            savedRoutesCount: response.data.user.stats.saved_routes_count,
           },
         };
 
@@ -245,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           stats: {
             totalDistance: response.data.user.stats.total_distance,
             totalWorkouts: response.data.user.stats.total_workouts,
-            completedRoutes: response.data.user.stats.completed_routes,
+            savedRoutesCount: response.data.user.stats.saved_routes_count,
           },
         };
 
@@ -298,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           stats: {
             totalDistance: response.data.stats.total_distance,
             totalWorkouts: response.data.stats.total_workouts,
-            completedRoutes: response.data.stats.completed_routes,
+            savedRoutesCount: response.data.stats.saved_routes_count,
           },
         };
 
@@ -311,6 +312,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /** 사용자 데이터 새로고침 (통계 업데이트 등) */
+  const refreshUserData = async () => {
+    if (!user) return;
+
+    try {
+      const response = await userApi.getMe();
+      if (response.success && response.data) {
+        const updatedUser: User = {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          avatar: response.data.avatar_url,
+          provider: response.data.provider || undefined,
+          stats: {
+            totalDistance: response.data.stats.total_distance,
+            totalWorkouts: response.data.stats.total_workouts,
+            savedRoutesCount: response.data.stats.saved_routes_count,
+          },
+        };
+
+        setUser(updatedUser);
+        await saveUserToStorage(updatedUser);
+      }
+    } catch (error) {
+      console.error("Failed to refresh user data:", error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -318,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signup,
     logout,
     updateProfile,
+    refreshUserData,
     isAuthenticated: !!user,
   };
 

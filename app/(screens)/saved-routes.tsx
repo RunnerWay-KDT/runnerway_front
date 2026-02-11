@@ -4,10 +4,12 @@ import {
   Bookmark,
   MapPin,
   Shield,
+  Trash2,
   User,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
@@ -16,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -27,16 +30,16 @@ import {
   Spacing,
 } from "../../constants/theme";
 import { getIconComponent } from "../../utils/shapeIcons";
+import { savedRouteApi } from "../../utils/api";
+import type { SavedRouteSummary } from "../../types/api";
 
-interface SavedRoute {
-  id: string;
+// 화면에 표시할 저장 경로 인터페이스
+interface SavedRouteItem {
+  id: string; // saved_route id
+  routeId: string; // 원본 route id
   routeName: string;
   distance: number;
   safetyScore: number;
-  location: {
-    address: string;
-    district: string;
-  };
   author: {
     id: string;
     name: string;
@@ -47,100 +50,73 @@ interface SavedRoute {
     iconName: string;
   };
   savedAt: string; // ISO8601
-  isDeleted?: boolean;
 }
 
-// Mock 데이터
-const MOCK_SAVED_ROUTES: SavedRoute[] = [
-  {
-    id: "route_001",
-    routeName: "한강 하트 경로",
-    distance: 4.2,
-    safetyScore: 92,
-    location: {
-      address: "서울특별시 영등포구 여의도동",
-      district: "여의도",
-    },
-    author: {
-      id: "user_123",
-      name: "러너왕",
-    },
-    routeData: {
-      shapeId: "heart",
-      shapeName: "하트",
-      iconName: "heart",
-    },
-    savedAt: "2026-01-20T15:30:00Z",
-  },
-  {
-    id: "route_002",
-    routeName: "올림픽공원 별 코스",
-    distance: 5.8,
-    safetyScore: 88,
-    location: {
-      address: "서울특별시 송파구 방이동",
-      district: "송파구",
-    },
-    author: {
-      id: "user_456",
-      name: "달리기조아",
-    },
-    routeData: {
-      shapeId: "star",
-      shapeName: "별",
-      iconName: "star",
-    },
-    savedAt: "2026-01-18T10:20:00Z",
-  },
-  {
-    id: "route_003",
-    routeName: "홍대 커피 경로",
-    distance: 3.5,
-    safetyScore: 85,
-    location: {
-      address: "서울특별시 마포구 서교동",
-      district: "홍대",
-    },
-    author: {
-      id: "user_789",
-      name: "카페러너",
-    },
-    routeData: {
-      shapeId: "coffee",
-      shapeName: "커피",
-      iconName: "coffee",
-    },
-    savedAt: "2026-01-15T18:45:00Z",
-  },
-  {
-    id: "route_004",
-    routeName: "남산 나비 코스",
-    distance: 6.2,
-    safetyScore: 95,
-    location: {
-      address: "서울특별시 중구 예장동",
-      district: "남산",
-    },
-    author: {
-      id: "user_012",
-      name: "산책러버",
-    },
-    routeData: {
-      shapeId: "butterfly",
-      shapeName: "나비",
-      iconName: "sparkles",
-    },
-    savedAt: "2026-01-12T08:00:00Z",
-  },
-];
+/** 백엔드 SavedRouteSummary → 프론트 SavedRouteItem 변환 */
+function toSavedRouteItem(r: SavedRouteSummary): SavedRouteItem {
+  return {
+    id: r.id,
+    routeId: r.route_id,
+    routeName: r.route_name,
+    distance: r.distance ?? 0,
+    safetyScore: r.safety_score ?? 0,
+    author: r.author ?? { id: "", name: "알 수 없음" },
+    routeData: r.shape
+      ? {
+          shapeId: r.shape.shape_id,
+          shapeName: r.shape.shape_name,
+          iconName: r.shape.icon_name,
+        }
+      : { shapeId: "custom", shapeName: "커스텀", iconName: "heart" },
+    savedAt: r.saved_at,
+  };
+}
 
 type SortOrder = "recent" | "distance" | "safety";
 
 export default function SavedRoutesScreen() {
   const router = useRouter();
-  const [routes, setRoutes] = useState<SavedRoute[]>(MOCK_SAVED_ROUTES);
+  const [routes, setRoutes] = useState<SavedRouteItem[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("recent");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
+
+  /** 저장한 경로 목록 로드 */
+  const loadRoutes = useCallback(
+    async (sort: SortOrder = sortOrder) => {
+      try {
+        const sortMap: Record<SortOrder, string> = {
+          recent: "date_desc",
+          distance: "distance_desc",
+          safety: "safety_desc",
+        };
+        const response = await savedRouteApi.getSavedRoutes({
+          page: 1,
+          limit: 50,
+          sort: sortMap[sort],
+        });
+
+        if (response.success && response.data) {
+          const items = response.data.routes.map(toSavedRouteItem);
+          setRoutes(items);
+        }
+      } catch (error) {
+        console.error("저장한 경로 조회 실패:", error);
+      }
+    },
+    [sortOrder],
+  );
+
+  // 최초 로드
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      await loadRoutes();
+      setIsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getSafetyColor = (score: number) => {
     if (score >= 90) return Colors.emerald[400];
@@ -169,7 +145,7 @@ export default function SavedRoutesScreen() {
     return `${month}월 ${day}일`;
   };
 
-  const handleSort = () => {
+  const toggleSortOrder = () => {
     let newOrder: SortOrder;
     if (sortOrder === "recent") {
       newOrder = "distance";
@@ -179,18 +155,7 @@ export default function SavedRoutesScreen() {
       newOrder = "recent";
     }
     setSortOrder(newOrder);
-
-    const sorted = [...routes].sort((a, b) => {
-      if (newOrder === "recent") {
-        return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime();
-      } else if (newOrder === "distance") {
-        return a.distance - b.distance;
-      } else {
-        return b.safetyScore - a.safetyScore;
-      }
-    });
-
-    setRoutes(sorted);
+    loadRoutes(newOrder);
   };
 
   const getSortLabel = () => {
@@ -201,43 +166,43 @@ export default function SavedRoutesScreen() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-
-    // TODO: 실제 API 호출
-    // const response = await fetch('/api/v1/users/me/saved-routes?page=1&limit=20', {
-    //   headers: { Authorization: `Bearer ${token}` }
-    // });
-
-    // Mock: 새로고침 시뮬레이션
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await loadRoutes();
     setIsRefreshing(false);
   };
 
-  const handleUnsave = (routeId: string, routeName: string) => {
+  /** 저장 취소 (삭제) */
+  const handleUnsave = (item: SavedRouteItem) => {
+    // 스와이프 닫기
+    swipeableRefs.current.get(item.id)?.close();
+
     Alert.alert(
       "저장 취소",
-      `"${routeName}"을(를) 저장 목록에서 삭제하시겠습니까?`,
+      `"${item.routeName}"을(를) 저장 목록에서 삭제하시겠습니까?`,
       [
-        {
-          text: "취소",
-          style: "cancel",
-        },
+        { text: "취소", style: "cancel" },
         {
           text: "삭제",
           style: "destructive",
-          onPress: () => {
-            // TODO: API 호출
-            // DELETE /api/v1/users/me/saved-routes/${routeId}
-
-            setRoutes((prev) => prev.filter((route) => route.id !== routeId));
+          onPress: async () => {
+            try {
+              const response = await savedRouteApi.unsaveRoute(item.routeId);
+              if (response.success) {
+                setRoutes((prev) => prev.filter((r) => r.id !== item.id));
+              }
+            } catch (error) {
+              console.error("경로 저장 취소 실패:", error);
+              Alert.alert(
+                "오류",
+                "저장 취소에 실패했습니다. 다시 시도해주세요.",
+              );
+            }
           },
         },
       ],
     );
   };
 
-  const handleRoutePress = (route: SavedRoute) => {
-    // 경로 미리보기 화면으로 이동 (저장된 경로 정보 전달)
+  const handleRoutePress = (route: SavedRouteItem) => {
     router.push({
       pathname: "/(screens)/route-preview",
       params: {
@@ -245,17 +210,35 @@ export default function SavedRoutesScreen() {
         shapeName: route.routeData.shapeName,
         distance: route.distance.toString(),
         fromSaved: "true",
-        routeId: route.id,
+        routeId: route.routeId,
         routeName: route.routeName,
       },
     });
+  };
+
+  /** 스와이프 시 오른쪽에 나타나는 삭제 버튼 */
+  const renderRightActions = (item: SavedRouteItem) => {
+    return (
+      <TouchableOpacity
+        style={styles.deleteAction}
+        activeOpacity={0.7}
+        onPress={() => handleUnsave(item)}
+      >
+        <View style={styles.deleteActionContent}>
+          <View style={styles.deleteIconContainer}>
+            <Trash2 size={20} color="#f87171" />
+          </View>
+          <Text style={styles.deleteActionText}>삭제</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   const renderRouteCard = ({
     item,
     index,
   }: {
-    item: SavedRoute;
+    item: SavedRouteItem;
     index: number;
   }) => {
     const RouteIcon = getIconComponent(item.routeData.iconName);
@@ -266,74 +249,77 @@ export default function SavedRoutesScreen() {
         entering={FadeInUp.delay(index * 50).duration(400)}
         style={styles.cardWrapper}
       >
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.7}
-          onPress={() => handleRoutePress(item)}
+        <Swipeable
+          ref={(ref) => {
+            if (ref) {
+              swipeableRefs.current.set(item.id, ref);
+            } else {
+              swipeableRefs.current.delete(item.id);
+            }
+          }}
+          renderRightActions={() => renderRightActions(item)}
+          overshootRight={false}
+          friction={2}
         >
-          {/* 왼쪽: 아이콘 */}
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: `${Colors.emerald[500]}20` },
-            ]}
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.7}
+            onPress={() => handleRoutePress(item)}
           >
-            <RouteIcon
-              size={32}
-              color={Colors.emerald[400]}
-              strokeWidth={1.5}
-            />
-          </View>
+            {/* 왼쪽: 아이콘 */}
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: `${Colors.emerald[500]}20` },
+              ]}
+            >
+              <RouteIcon
+                size={32}
+                color={Colors.emerald[400]}
+                strokeWidth={1.5}
+              />
+            </View>
 
-          {/* 중앙: 경로 정보 */}
-          <View style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.routeName} numberOfLines={1}>
-                {item.routeName}
-              </Text>
-              <TouchableOpacity
-                style={styles.unsaveButton}
-                onPress={() => handleUnsave(item.id, item.routeName)}
-                activeOpacity={0.7}
-              >
+            {/* 중앙: 경로 정보 */}
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.routeName} numberOfLines={1}>
+                  {item.routeName}
+                </Text>
+              </View>
+
+              {/* 정보 그리드 */}
+              <View style={styles.infoGrid}>
+                <View style={styles.infoItem}>
+                  <MapPin size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.infoText}>
+                    {item.distance.toFixed(1)}km
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Shield size={14} color={safetyColor} />
+                  <Text style={[styles.infoText, { color: safetyColor }]}>
+                    {getSafetyText(item.safetyScore)} {item.safetyScore}
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <User size={14} color={Colors.zinc[500]} />
+                  <Text style={styles.infoText}>{item.author.name}</Text>
+                </View>
+              </View>
+
+              {/* 저장 날짜 */}
+              <View style={styles.dateRow}>
                 <Bookmark
-                  size={20}
-                  color={Colors.emerald[500]}
-                  fill={Colors.emerald[500]}
-                  strokeWidth={2}
+                  size={12}
+                  color={Colors.zinc[600]}
+                  fill={Colors.zinc[600]}
                 />
-              </TouchableOpacity>
-            </View>
-
-            {/* 정보 그리드 */}
-            <View style={styles.infoGrid}>
-              <View style={styles.infoItem}>
-                <MapPin size={14} color={Colors.zinc[500]} />
-                <Text style={styles.infoText}>
-                  {item.distance.toFixed(1)}km
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Shield size={14} color={safetyColor} />
-                <Text style={[styles.infoText, { color: safetyColor }]}>
-                  {getSafetyText(item.safetyScore)} {item.safetyScore}
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <User size={14} color={Colors.zinc[500]} />
-                <Text style={styles.infoText}>{item.author.name}</Text>
+                <Text style={styles.dateText}>{formatDate(item.savedAt)}</Text>
               </View>
             </View>
-
-            {/* 위치 & 저장 날짜 */}
-            <View style={styles.bottomRow}>
-              <Text style={styles.locationText} numberOfLines={1}>
-                📍 {item.location.district}
-              </Text>
-              <Text style={styles.dateText}>{formatDate(item.savedAt)}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </Swipeable>
       </Animated.View>
     );
   };
@@ -366,7 +352,7 @@ export default function SavedRoutesScreen() {
         </View>
         <TouchableOpacity
           style={styles.sortButton}
-          onPress={handleSort}
+          onPress={toggleSortOrder}
           activeOpacity={0.7}
         >
           <ArrowUpDown size={16} color={Colors.zinc[400]} />
@@ -384,26 +370,33 @@ export default function SavedRoutesScreen() {
         onBack={() => router.back()}
       />
 
-      <FlatList
-        data={routes}
-        renderItem={renderRouteCard}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={routes.length > 0 ? renderHeader : null}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={[
-          styles.listContent,
-          routes.length === 0 && styles.listContentEmpty,
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.emerald[500]}
-            colors={[Colors.emerald[500]]}
-          />
-        }
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.emerald[500]} />
+          <Text style={styles.loadingText}>경로를 불러오는 중...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={routes}
+          renderItem={renderRouteCard}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={routes.length > 0 ? renderHeader : null}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={[
+            styles.listContent,
+            routes.length === 0 && styles.listContentEmpty,
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={Colors.emerald[500]}
+              colors={[Colors.emerald[500]]}
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -412,6 +405,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.zinc[950],
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[400],
   },
   listContent: {
     padding: Spacing.lg,
@@ -460,6 +463,8 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     marginBottom: Spacing.md,
+    overflow: "hidden",
+    borderRadius: BorderRadius["2xl"],
   },
   card: {
     flexDirection: "row",
@@ -491,10 +496,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
     flex: 1,
-    marginRight: Spacing.sm,
-  },
-  unsaveButton: {
-    padding: 4,
   },
   infoGrid: {
     flexDirection: "row",
@@ -511,16 +512,10 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.zinc[400],
   },
-  bottomRow: {
+  dateRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-  },
-  locationText: {
-    fontSize: FontSize.xs,
-    color: Colors.zinc[500],
-    flex: 1,
-    marginRight: Spacing.sm,
+    gap: 4,
   },
   dateText: {
     fontSize: FontSize.xs,
@@ -564,5 +559,29 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     color: "#fff",
+  },
+  deleteAction: {
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 88,
+  },
+  deleteActionContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  deleteIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteActionText: {
+    color: "#f87171",
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
   },
 });

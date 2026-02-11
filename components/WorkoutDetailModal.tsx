@@ -8,9 +8,11 @@ import {
   TrendingUp,
   X,
   Zap,
+  Route,
 } from "lucide-react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Modal,
   ScrollView,
@@ -28,6 +30,8 @@ import {
 } from "../constants/theme";
 import { getIconComponent } from "../utils/shapeIcons";
 import { KakaoMap } from "./KakaoMap";
+import { workoutApi } from "../utils/api";
+import type { WorkoutDetail } from "../types/api";
 
 const { height } = Dimensions.get("window");
 
@@ -49,13 +53,39 @@ interface WorkoutDetailModalProps {
     };
     completedAt: string;
   } | null;
+  workoutId?: string | null;
 }
 
 export function WorkoutDetailModal({
   visible,
   onClose,
   workout,
+  workoutId,
 }: WorkoutDetailModalProps) {
+  const [detail, setDetail] = useState<WorkoutDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  // workoutId가 있으면 상세 API 호출
+  useEffect(() => {
+    if (visible && workoutId) {
+      (async () => {
+        setIsLoadingDetail(true);
+        try {
+          const response = await workoutApi.getWorkoutDetail(workoutId);
+          if (response.success && response.data) {
+            setDetail(response.data);
+          }
+        } catch (error) {
+          console.error("운동 상세 조회 실패:", error);
+        } finally {
+          setIsLoadingDetail(false);
+        }
+      })();
+    } else if (!visible) {
+      setDetail(null);
+    }
+  }, [visible, workoutId]);
+
   if (!workout) return null;
 
   const RouteIcon = getIconComponent(workout.routeData.iconName);
@@ -88,53 +118,70 @@ export function WorkoutDetailModal({
       .padStart(2, "0")}`;
   };
 
-  const avgSpeed = (workout.distance / (workout.duration / 3600)).toFixed(1);
-  const maxSpeed = (parseFloat(avgSpeed) * 1.3).toFixed(1); // Mock: 최대 속도 (평균의 1.3배)
+  // 상세 데이터에서 값 사용 (있으면)
+  const displayDistance = detail?.distance ?? workout.distance;
+  const displayDuration = detail?.duration ?? workout.duration;
+  const displayPace = detail?.avg_pace ?? workout.pace;
+  const displayCalories = detail?.calories ?? workout.calories;
+  const displayCompletion = detail?.route_completion;
+
+  const realAvgSpeed =
+    displayDuration > 0
+      ? (displayDistance / (displayDuration / 3600)).toFixed(1)
+      : "0.0";
 
   const detailStats = [
     {
       icon: MapPin,
       label: "거리",
-      value: `${workout.distance.toFixed(2)}`,
+      value: `${displayDistance.toFixed(2)}`,
       unit: "km",
       color: Colors.emerald[400],
     },
     {
       icon: Clock,
       label: "시간",
-      value: formatDuration(workout.duration),
+      value: formatDuration(displayDuration),
       unit: "",
       color: Colors.blue[400],
     },
     {
       icon: TrendingUp,
       label: "평균 페이스",
-      value: workout.pace,
+      value: displayPace,
       unit: "/km",
       color: Colors.purple[400],
     },
     {
       icon: Flame,
       label: "칼로리",
-      value: `${workout.calories}`,
+      value: `${displayCalories}`,
       unit: "kcal",
       color: Colors.orange[400],
     },
     {
       icon: Zap,
       label: "평균 속도",
-      value: avgSpeed,
+      value: realAvgSpeed,
       unit: "km/h",
       color: Colors.amber[400],
     },
     {
       icon: Award,
-      label: "최고 속도",
-      value: maxSpeed,
-      unit: "km/h",
+      label: displayCompletion != null ? "완주율" : "최고 속도",
+      value:
+        displayCompletion != null
+          ? `${displayCompletion.toFixed(0)}`
+          : (parseFloat(realAvgSpeed) * 1.3).toFixed(1),
+      unit: displayCompletion != null ? "%" : "km/h",
       color: Colors.pink[400],
     },
   ];
+
+  // 경로 비교용 데이터
+  const plannedPath = detail?.planned_path ?? null;
+  const actualPath = detail?.actual_path ?? null;
+  const splits = detail?.splits ?? null;
 
   return (
     <Modal
@@ -191,16 +238,69 @@ export function WorkoutDetailModal({
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {/* 지도 영역 */}
+            {/* 지도 영역 - 상세 데이터 로딩 중이면 로더 표시 */}
             <View style={styles.mapSection}>
               <View style={styles.mapContainer}>
-                <KakaoMap routePath={workout.routeData.shapeId} />
+                {isLoadingDetail ? (
+                  <View style={styles.mapLoading}>
+                    <ActivityIndicator
+                      size="large"
+                      color={Colors.emerald[500]}
+                    />
+                    <Text style={styles.mapLoadingText}>
+                      경로 불러오는 중...
+                    </Text>
+                  </View>
+                ) : plannedPath || actualPath ? (
+                  <KakaoMap
+                    plannedPath={plannedPath ?? undefined}
+                    actualPath={actualPath ?? undefined}
+                  />
+                ) : (
+                  <KakaoMap routePath={workout.routeData.shapeId} />
+                )}
               </View>
               <LinearGradient
                 colors={["transparent", Colors.zinc[950]]}
                 style={styles.mapGradient}
               />
             </View>
+
+            {/* 경로 비교 범례 (계획/실제 경로가 있을 때) */}
+            {(plannedPath || actualPath) && (
+              <View style={styles.legendSection}>
+                {plannedPath && (
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[
+                        styles.legendLine,
+                        { backgroundColor: "#a1a1aa", borderStyle: "dashed" },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>계획 경로</Text>
+                  </View>
+                )}
+                {actualPath && (
+                  <View style={styles.legendItem}>
+                    <View
+                      style={[
+                        styles.legendLine,
+                        { backgroundColor: Colors.emerald[400] },
+                      ]}
+                    />
+                    <Text style={styles.legendText}>실제 경로</Text>
+                  </View>
+                )}
+                {displayCompletion != null && (
+                  <View style={styles.completionBadge}>
+                    <Route size={12} color={Colors.emerald[400]} />
+                    <Text style={styles.completionText}>
+                      {displayCompletion.toFixed(0)}% 완주
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* 날짜 정보 */}
             <View style={styles.dateSection}>
@@ -259,11 +359,40 @@ export function WorkoutDetailModal({
                   <Text
                     style={[styles.infoValue, { color: Colors.orange[400] }]}
                   >
-                    {workout.calories} kcal
+                    {displayCalories} kcal
                   </Text>
                 </View>
               </View>
             </View>
+
+            {/* 구간 기록 (splits) */}
+            {splits && splits.length > 0 && (
+              <View style={styles.splitsSection}>
+                <Text style={styles.sectionTitle}>구간 기록</Text>
+                <View style={styles.splitsCard}>
+                  <View style={styles.splitsHeader}>
+                    <Text style={styles.splitsHeaderText}>구간</Text>
+                    <Text style={styles.splitsHeaderText}>페이스</Text>
+                    <Text style={styles.splitsHeaderText}>시간</Text>
+                  </View>
+                  {splits.map((split, index) => (
+                    <View key={index}>
+                      <View style={styles.splitsRow}>
+                        <Text style={styles.splitsKm}>{split.km} km</Text>
+                        <Text style={styles.splitsPace}>{split.pace}</Text>
+                        <Text style={styles.splitsDuration}>
+                          {Math.floor(split.duration / 60)}:
+                          {(split.duration % 60).toString().padStart(2, "0")}
+                        </Text>
+                      </View>
+                      {index < splits.length - 1 && (
+                        <View style={styles.splitsDivider} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* 하단 여백 */}
             <View style={{ height: Spacing["2xl"] }} />
@@ -444,5 +573,111 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.zinc[800],
     marginVertical: 4,
+  },
+  // 지도 로딩
+  mapLoading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.zinc[900],
+  },
+  mapLoadingText: {
+    marginTop: Spacing.sm,
+    fontSize: FontSize.sm,
+    color: Colors.zinc[500],
+  },
+  // 경로 비교 범례
+  legendSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendLine: {
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+  },
+  legendText: {
+    fontSize: FontSize.xs,
+    color: Colors.zinc[400],
+  },
+  completionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginLeft: "auto",
+    backgroundColor: `${Colors.emerald[500]}20`,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.md,
+  },
+  completionText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold as any,
+    color: Colors.emerald[400],
+  },
+  // 구간 기록 (splits)
+  splitsSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+  splitsCard: {
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[800],
+    padding: Spacing.md,
+  },
+  splitsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.zinc[800],
+    marginBottom: Spacing.sm,
+  },
+  splitsHeaderText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold as any,
+    color: Colors.zinc[500],
+    flex: 1,
+    textAlign: "center",
+  },
+  splitsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: Spacing.xs,
+  },
+  splitsKm: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium as any,
+    color: Colors.zinc[300],
+    flex: 1,
+    textAlign: "center",
+  },
+  splitsPace: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold as any,
+    color: Colors.emerald[400],
+    flex: 1,
+    textAlign: "center",
+  },
+  splitsDuration: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+    flex: 1,
+    textAlign: "center",
+  },
+  splitsDivider: {
+    height: 1,
+    backgroundColor: Colors.zinc[800],
+    marginVertical: 2,
   },
 });
