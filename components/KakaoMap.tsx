@@ -210,28 +210,40 @@ export function KakaoMap({
         // 마커 추가
         ${markers
           .map(
-            (marker, index) => `
+            (marker, index) => {
+              const m = marker as { lat: number; lng: number; title?: string; color?: string; icon?: string };
+              const color = m.color || "#6b7280";
+              const emoji = m.icon === "cafe" ? "☕" : m.icon === "convenience" ? "🏪" : "📍";
+              const titleEscaped = (m.title || "").replace(/'/g, "\\'").replace(/</g, "&lt;");
+              return `
           try {
-            var marker${index} = new kakao.maps.Marker({
-              position: new kakao.maps.LatLng(${marker.lat}, ${marker.lng}),
-              map: map
+            var pos${index} = new kakao.maps.LatLng(${m.lat}, ${m.lng});
+            var circleDiv${index} = document.createElement('div');
+            circleDiv${index}.style.cssText = 'width:28px;height:28px;background:${color};border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,0.3);';
+            circleDiv${index}.innerText = '${emoji}';
+            var overlay${index} = new kakao.maps.CustomOverlay({
+              position: pos${index},
+              content: circleDiv${index},
+              yAnchor: 0.5
             });
+            overlay${index}.setMap(map);
             ${
-              marker.title
+              m.title
                 ? `
-              var infowindow${index} = new kakao.maps.InfoWindow({
-                content: '<div style="padding:5px;font-size:12px;">${marker.title}</div>'
-              });
-              kakao.maps.event.addListener(marker${index}, 'click', function() {
-                infowindow${index}.open(map, marker${index});
-              });
+            var iw${index} = new kakao.maps.InfoWindow({
+              content: '<div style="padding:6px 8px;font-size:12px;max-width:120px;">' + ${JSON.stringify(titleEscaped)} + '</div>'
+            });
+            circleDiv${index}.addEventListener('click', function() {
+              iw${index}.open(map, pos${index});
+            });
             `
                 : ""
             }
           } catch(e) {
             sendLog('error', 'Marker ${index} error: ' + e.message);
           }
-        `,
+        `;
+            },
           )
           .join("")}
 
