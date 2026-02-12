@@ -782,6 +782,33 @@ export const savedRouteApi = {
 // ============================================
 export const communityApi = {
   /**
+   * 피드 조회 → GET /api/v1/community/feed
+   */
+  async getFeed(params?: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+  }): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", String(params.page));
+    if (params?.limit) queryParams.append("limit", String(params.limit));
+    if (params?.sort) queryParams.append("sort", params.sort);
+
+    const queryString = queryParams.toString();
+    const url = `${API_CONFIG.ENDPOINTS.COMMUNITY.FEED}${queryString ? `?${queryString}` : ""}`;
+    return apiClient.get<ApiResponse>(url);
+  },
+
+  /**
+   * 게시물 상세 조회 → GET /api/v1/community/posts/{post_id}
+   */
+  async getPostDetail(postId: string): Promise<ApiResponse> {
+    return apiClient.get<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.POSTS}/${postId}`,
+    );
+  },
+
+  /**
    * 게시물 작성 → POST /api/v1/community/posts
    */
   async createPost(data: {
@@ -801,6 +828,70 @@ export const communityApi = {
     return apiClient.post<ApiResponse>(
       API_CONFIG.ENDPOINTS.COMMUNITY.POSTS,
       data,
+    );
+  },
+
+  /**
+   * 좋아요 → POST /api/v1/community/posts/{post_id}/like
+   */
+  async likePost(postId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.POST_LIKE}/${postId}/like`,
+    );
+  },
+
+  /**
+   * 좋아요 취소 → DELETE /api/v1/community/posts/{post_id}/like
+   */
+  async unlikePost(postId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.POST_LIKE}/${postId}/like`,
+    );
+  },
+
+  /**
+   * 북마크 → POST /api/v1/community/posts/{post_id}/bookmark
+   */
+  async bookmarkPost(postId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.POST_BOOKMARK}/${postId}/bookmark`,
+    );
+  },
+
+  /**
+   * 북마크 취소 → DELETE /api/v1/community/posts/{post_id}/bookmark
+   */
+  async unbookmarkPost(postId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.POST_BOOKMARK}/${postId}/bookmark`,
+    );
+  },
+
+  /**
+   * 댓글 작성 → POST /api/v1/community/posts/{post_id}/comments
+   */
+  async createComment(postId: string, content: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.COMMENTS}/${postId}/comments`,
+      { content },
+    );
+  },
+
+  /**
+   * 댓글 삭제 → DELETE /api/v1/community/comments/{comment_id}
+   */
+  async deleteComment(commentId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.COMMENT_DELETE}/${commentId}`,
+    );
+  },
+
+  /**
+   * 댓글 좋아요 → POST /api/v1/community/comments/{comment_id}/like
+   */
+  async likeComment(commentId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.COMMENT_LIKE}/${commentId}/like`,
     );
   },
 };
