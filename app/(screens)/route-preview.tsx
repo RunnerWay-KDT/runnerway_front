@@ -42,7 +42,8 @@ interface RouteOption {
   safety: number;
   elevation: number;
   lighting: number;
-  convenience: number;
+  cafeCount?: number;
+  convenienceCount?: number;
   difficulty: string;
   tag: string | null;
   // 경로 옵션 ID
@@ -81,7 +82,7 @@ export default function RoutePreviewScreen() {
         safety: 95,
         elevation: 10,
         lighting: 92,
-        convenience: 5,
+        convenienceCount: 5,
         difficulty: "쉬움",
         tag: fromSaved ? null : "추천",
       },
@@ -96,7 +97,7 @@ export default function RoutePreviewScreen() {
         safety: 88,
         elevation: 12,
         lighting: 87,
-        convenience: 3,
+        convenienceCount: 3,
         difficulty: "보통",
         tag: fromSaved ? null : "BEST",
       },
@@ -111,7 +112,7 @@ export default function RoutePreviewScreen() {
         safety: 84,
         elevation: 18,
         lighting: 80,
-        convenience: 2,
+        convenienceCount: 2,
         difficulty: "도전",
         tag: null,
       },
@@ -132,6 +133,46 @@ export default function RoutePreviewScreen() {
   const [selectedRoute, setSelectedRoute] = useState<RouteOption | null>(
     routeId ? null : fallbackOptions[1],
   );
+
+  const [optionPlaces, setOptionPlaces] = useState<{ lat: number; lng: number; name: string; category: string }[]>([]);
+
+  useEffect(() => {
+    if (!routeId || !selectedRoute?.optionId) {
+      setOptionPlaces([]);
+      return;
+    } 
+    let cancelled = false;
+    routeApi
+      .getOptionPlaces(routeId, selectedRoute.optionId)
+      .then((res: unknown) => {
+        if (cancelled) return;
+        const data = (res as { data?: { places?: Array<{ lat: number; lng: number; name: string; category: string }>}})?.data;
+        setOptionPlaces(data?.places ?? []);
+      })
+      .catch(() => setOptionPlaces([]));
+      return () => { cancelled = true; }
+  }, [routeId, selectedRoute?.optionId]);
+
+  type PlaceMarkerFilter = "all" | "cafe" | "convenience" | "none";
+  const [placeMarkerFilter, setPlaceMarkerFilter] = useState<PlaceMarkerFilter>("all");
+
+  const filteredPlaceMarkers = (() => {
+    if (placeMarkerFilter === "none") return [];
+    return optionPlaces
+      .filter((p) => {
+        if (placeMarkerFilter === "all") return true;
+        if (placeMarkerFilter === "cafe") return p.category === "cafe";
+        if (placeMarkerFilter === "convenience") return p.category === "convenience";
+        return false;
+      })
+      .map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        title: p.name,
+        icon: p.category === "cafe" ? "cafe" : "convenience",
+        color: p.category === "cafe" ? "#8B4512" : "#2563eb",
+      }));
+  })();
 
   useEffect(() => {
     if (!routeId) {
@@ -157,6 +198,9 @@ export default function RoutePreviewScreen() {
                 tag: string | null;
                 coordinates: Array<{ lat: number; lng: number }>;
                 scores?: { safety?: number; elevation?: number };
+                place_ids?: { cafe?: number[]; convenience?: number[] };
+                cafe_count?: number;
+                convenience_count?: number;
               }>;
             };
           }
@@ -178,7 +222,8 @@ export default function RoutePreviewScreen() {
           elevation: opt.scores?.elevation ?? 0,
           lighting: (opt.scores as { lighting?: number })?.lighting ?? 0,
           sidewalk: (opt.scores as { sidewalk?: number })?.sidewalk ?? 0,
-          convenience: 0,
+          cafeCount: opt.cafe_count ?? 0,
+          convenienceCount: opt.convenience_count ?? 0,
           difficulty: opt.difficulty ?? "보통",
           tag: opt.tag ?? null,
           optionId: opt.id,
@@ -285,15 +330,56 @@ export default function RoutePreviewScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Map */}
-      <KakaoMap
-        key={mapPolyline.length > 0 ? "path" : "preset"}
-        routePath={iconName}
-        polyline={mapPolyline}
-        center={mapCenter}
-        startPosition={startPosition}
-        isLoading={!selectedRoute || optionsLoading}
-      />
+      {/* Background Map + 마커 필터 버튼 */}
+      <View style={styles.mapWrapper}>
+        <KakaoMap
+          key={mapPolyline.length > 0 ? "path" : "preset"}
+          routePath={iconName}
+          polyline={mapPolyline}
+          center={mapCenter}
+          startPosition={startPosition}
+          isLoading={!selectedRoute || optionsLoading}
+          markers={filteredPlaceMarkers}
+        />
+        <View style={styles.placeFilterButtons} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "convenience" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "convenience" ? "all" : "convenience"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>🏪</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "cafe" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "cafe" ? "all" : "cafe"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>☕</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "none" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "none" ? "all" : "none"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>⊘</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Header */}
       <View style={styles.header}>
@@ -623,25 +709,13 @@ export default function RoutePreviewScreen() {
                   <View style={styles.facilityCard}>
                     <Text style={styles.facilityLabel}>편의점</Text>
                     <Text style={styles.facilityValue}>
-                      {selectedRoute.convenience}곳
+                      {selectedRoute.convenienceCount}곳
                     </Text>
                   </View>
                   <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>화장실</Text>
+                    <Text style={styles.facilityLabel}>카페</Text>
                     <Text style={styles.facilityValue}>
-                      {Math.ceil(selectedRoute.convenience / 2)}곳
-                    </Text>
-                  </View>
-                  <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>음수대</Text>
-                    <Text style={styles.facilityValue}>
-                      {selectedRoute.convenience + 2}곳
-                    </Text>
-                  </View>
-                  <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>CCTV</Text>
-                    <Text style={styles.facilityValue}>
-                      {Math.round(selectedRoute.safety / 5)}대
+                      {selectedRoute.cafeCount}곳
                     </Text>
                   </View>
                 </View>
@@ -980,5 +1054,36 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
+  },
+  mapWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  placeFilterButtons: {
+    position: "absolute",
+    top: 100,
+    right: Spacing.md,
+    flexDirection: "column",
+    gap: Spacing.sm,
+    zIndex: 10,
+  },
+  placeFilterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  placeFilterBtnActive: {
+    backgroundColor: Colors.emerald[500],
+  },
+  placeFilterBtnEmoji: {
+    fontSize: 20,
   },
 });
