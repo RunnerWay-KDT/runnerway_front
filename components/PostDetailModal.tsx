@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import {
+  Bookmark,
   Clock,
   Flame,
   Heart,
@@ -98,11 +99,13 @@ export function PostDetailModal({
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [totalCommentCount, setTotalCommentCount] = useState(0);
 
   // 모달이 열릴 때 게시글 상세 + 댓글 로드
   useEffect(() => {
     if (visible && post) {
       setNewComment("");
+      setTotalCommentCount(post.comments);
       loadComments();
     }
   }, [visible, post?.id]);
@@ -126,6 +129,9 @@ export function PostDetailModal({
             isLiked: c.is_liked || false,
           })),
         );
+      }
+      if (response?.data?.post?.comment_count != null) {
+        setTotalCommentCount(response.data.post.comment_count);
       }
     } catch (error) {
       console.error("댓글 로드 실패:", error);
@@ -187,6 +193,7 @@ export function PostDetailModal({
           isLiked: false,
         };
         setComments((prev) => [newCommentData, ...prev]);
+        setTotalCommentCount((prev) => prev + 1);
       }
       setNewComment("");
     } catch (error) {
@@ -199,6 +206,8 @@ export function PostDetailModal({
   const handleCommentLike = async (commentId: string) => {
     const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
+
+    const wasLiked = comment.isLiked;
 
     // Optimistic update
     setComments((prev) =>
@@ -214,9 +223,24 @@ export function PostDetailModal({
     );
 
     try {
-      await communityApi.likeComment(commentId);
+      if (wasLiked) {
+        await communityApi.unlikeComment(commentId);
+      } else {
+        await communityApi.likeComment(commentId);
+      }
     } catch (error) {
-      // 이미 좋아요 에러 등은 무시 (UI는 이미 반영됨)
+      // Rollback on failure
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                isLiked: wasLiked,
+                likes: wasLiked ? c.likes + 1 : c.likes - 1,
+              }
+            : c,
+        ),
+      );
       console.error("댓글 좋아요 실패:", error);
     }
   };
@@ -311,10 +335,12 @@ export function PostDetailModal({
                   </View>
                   <View style={styles.routeText}>
                     <Text style={styles.routeName}>{post.route.name}</Text>
-                    <View style={styles.locationRow}>
-                      <MapPin size={12} color={Colors.zinc[500]} />
-                      <Text style={styles.locationText}>{post.location}</Text>
-                    </View>
+                    {post.location ? (
+                      <View style={styles.locationRow}>
+                        <MapPin size={12} color={Colors.zinc[500]} />
+                        <Text style={styles.locationText}>{post.location}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
@@ -329,12 +355,16 @@ export function PostDetailModal({
                   </View>
                   <View style={styles.statItem}>
                     <Clock size={16} color={Colors.blue[400]} />
-                    <Text style={styles.statValue}>{post.route.duration}</Text>
+                    <Text style={styles.statValue}>
+                      {Math.floor(post.route.duration / 60)}
+                    </Text>
                     <Text style={styles.statLabel}>분</Text>
                   </View>
                   <View style={styles.statItem}>
                     <TrendingUp size={16} color={Colors.purple[400]} />
-                    <Text style={styles.statValue}>{post.route.pace}</Text>
+                    <Text style={styles.statValue}>
+                      {post.route.pace || "-"}
+                    </Text>
                     <Text style={styles.statLabel}>/km</Text>
                   </View>
                   <View style={styles.statItem}>
@@ -376,8 +406,30 @@ export function PostDetailModal({
 
                 <View style={styles.actionButton}>
                   <MessageCircle size={24} color={Colors.zinc[400]} />
-                  <Text style={styles.actionCount}>{comments.length}</Text>
+                  <Text style={styles.actionCount}>{totalCommentCount}</Text>
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { marginLeft: "auto" }]}
+                  onPress={() => onBookmark(post.id)}
+                  activeOpacity={0.7}
+                >
+                  <Bookmark
+                    size={24}
+                    color={
+                      post.isBookmarked ? Colors.amber[500] : Colors.zinc[400]
+                    }
+                    fill={post.isBookmarked ? Colors.amber[500] : "transparent"}
+                  />
+                  <Text
+                    style={[
+                      styles.actionCount,
+                      post.isBookmarked && { color: Colors.amber[500] },
+                    ]}
+                  >
+                    {post.bookmarks}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* 댓글 섹션 */}
@@ -385,7 +437,7 @@ export function PostDetailModal({
                 <View style={styles.commentsSectionHeader}>
                   <MessageCircle size={18} color={Colors.zinc[400]} />
                   <Text style={styles.commentsTitle}>
-                    댓글 {comments.length}
+                    댓글 {totalCommentCount}
                   </Text>
                 </View>
 
@@ -410,35 +462,31 @@ export function PostDetailModal({
                         <Text style={styles.commentText}>
                           {comment.content}
                         </Text>
-                        {comment.likes > 0 && (
-                          <TouchableOpacity
-                            style={styles.commentLike}
-                            onPress={() => handleCommentLike(comment.id)}
-                            activeOpacity={0.7}
+                        <TouchableOpacity
+                          style={styles.commentLike}
+                          onPress={() => handleCommentLike(comment.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Heart
+                            size={12}
+                            color={
+                              comment.isLiked
+                                ? Colors.red[500]
+                                : Colors.zinc[600]
+                            }
+                            fill={
+                              comment.isLiked ? Colors.red[500] : "transparent"
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.commentLikeCount,
+                              comment.isLiked && { color: Colors.red[500] },
+                            ]}
                           >
-                            <Heart
-                              size={12}
-                              color={
-                                comment.isLiked
-                                  ? Colors.red[500]
-                                  : Colors.zinc[600]
-                              }
-                              fill={
-                                comment.isLiked
-                                  ? Colors.red[500]
-                                  : "transparent"
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.commentLikeCount,
-                                comment.isLiked && { color: Colors.red[500] },
-                              ]}
-                            >
-                              {comment.likes}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
+                            {comment.likes}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>

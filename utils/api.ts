@@ -894,6 +894,15 @@ export const communityApi = {
       `${API_CONFIG.ENDPOINTS.COMMUNITY.COMMENT_LIKE}/${commentId}/like`,
     );
   },
+
+  /**
+   * 댓글 좋아요 취소 → DELETE /api/v1/community/comments/{comment_id}/like
+   */
+  async unlikeComment(commentId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(
+      `${API_CONFIG.ENDPOINTS.COMMUNITY.COMMENT_LIKE}/${commentId}/like`,
+    );
+  },
 };
 
 // 기본 내보내기
