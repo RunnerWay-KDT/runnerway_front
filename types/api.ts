@@ -256,6 +256,7 @@ export interface SavedRouteSummary {
     shape_name: string;
     icon_name: string;
   } | null;
+  svg_path: string | null; // 커스텀 경로의 SVG path 데이터
   author: {
     id: string;
     name: string;

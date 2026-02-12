@@ -22,6 +22,7 @@ import { Swipeable } from "react-native-gesture-handler";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
 import {
   BorderRadius,
   Colors,
@@ -41,6 +42,7 @@ interface SavedRouteItem {
   routeName: string;
   distance: number;
   safetyScore: number;
+  svgPath: string | null; // 커스텀 경로 SVG path
   author: {
     id: string;
     name: string;
@@ -62,6 +64,7 @@ function toSavedRouteItem(r: SavedRouteSummary): SavedRouteItem {
     routeName: r.route_name,
     distance: r.distance ?? 0,
     safetyScore: r.safety_score ?? 0,
+    svgPath: r.svg_path ?? null,
     author: r.author ?? { id: "", name: "알 수 없음" },
     routeData: r.shape
       ? {
@@ -269,18 +272,30 @@ export default function SavedRoutesScreen() {
             activeOpacity={0.7}
             onPress={() => handleRoutePress(item)}
           >
-            {/* 왼쪽: 아이콘 */}
+            {/* 왼쪽: 아이콘 (커스텀 경로면 SVG path 보라색, 프리셋이면 기존 아이콘) */}
             <View
               style={[
                 styles.iconContainer,
-                { backgroundColor: `${Colors.emerald[500]}20` },
+                {
+                  backgroundColor: item.svgPath
+                    ? `${Colors.purple[500]}20`
+                    : `${Colors.emerald[500]}20`,
+                },
               ]}
             >
-              <RouteIcon
-                size={32}
-                color={Colors.emerald[400]}
-                strokeWidth={1.5}
-              />
+              {item.svgPath ? (
+                <SvgPathIcon
+                  svgPath={item.svgPath}
+                  size={32}
+                  color={Colors.purple[400]}
+                />
+              ) : (
+                <RouteIcon
+                  size={32}
+                  color={Colors.emerald[400]}
+                  strokeWidth={1.5}
+                />
+              )}
             </View>
 
             {/* 중앙: 경로 정보 */}
