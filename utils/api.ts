@@ -747,10 +747,14 @@ export const savedRouteApi = {
   async saveRoute(
     routeId: string,
     routeOptionId?: string,
+    name?: string,
   ): Promise<ApiResponse> {
+    const body: Record<string, string> = {};
+    if (routeOptionId) body.route_option_id = routeOptionId;
+    if (name) body.name = name;
     return apiClient.post<ApiResponse>(
       `${API_CONFIG.ENDPOINTS.SAVED_ROUTES.SAVE}/${routeId}/save`,
-      routeOptionId ? { route_option_id: routeOptionId } : undefined,
+      Object.keys(body).length > 0 ? body : undefined,
     );
   },
 

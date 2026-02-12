@@ -11,10 +11,13 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
@@ -57,6 +60,12 @@ export default function ResultScreen() {
 
   // 북마크 상태
   const [isBookmarked, setIsBookmarked] = useState(false);
+
+  // 이름 수정 모달 상태
+  const [isNameModalVisible, setIsNameModalVisible] = useState(false);
+  const [editRouteName, setEditRouteName] = useState(
+    (params.routeName as string) || (params.shapeName as string) || "내 경로",
+  );
 
   // 경로 비교를 위한 state
   const [plannedPath, setPlannedPath] = useState<
@@ -227,29 +236,51 @@ export default function ResultScreen() {
     router.replace("/(tabs)");
   };
 
-  /** 북마크 토글 */
-  const handleToggleBookmark = async () => {
+  /** 저장 버튼 클릭 → 이름 입력 모달 표시 또는 북마크 해제 */
+  const handleToggleBookmark = () => {
     if (!routeId) {
-      Alert.alert("알림", "경로 정보가 없어 북마크할 수 없습니다.");
+      Alert.alert("알림", "경로 정보가 없어 저장할 수 없습니다.");
       return;
     }
 
-    const wasBookmarked = isBookmarked;
-    setIsBookmarked(!wasBookmarked);
+    if (isBookmarked) {
+      // 이미 저장된 경우 → 바로 저장 해제
+      handleUnsaveRoute();
+    } else {
+      // 저장하기 → 이름 수정 모달 표시
+      setIsNameModalVisible(true);
+    }
+  };
+
+  /** 북마크 해제 */
+  const handleUnsaveRoute = async () => {
+    setIsBookmarked(false);
+    try {
+      await savedRouteApi.unsaveRoute(routeId);
+      Alert.alert("알림", "저장이 해제되었습니다.");
+    } catch (error) {
+      setIsBookmarked(true);
+      console.error("저장 해제 실패:", error);
+      Alert.alert("오류", "저장 해제에 실패했습니다. 다시 시도해주세요.");
+    }
+  };
+
+  /** 이름 확인 후 저장 (모달에서 확인 누를 때) */
+  const handleConfirmSave = async () => {
+    setIsNameModalVisible(false);
+    setIsBookmarked(true);
 
     try {
-      if (wasBookmarked) {
-        await savedRouteApi.unsaveRoute(routeId);
-        Alert.alert("알림", "북마크가 해제되었습니다.");
-      } else {
-        await savedRouteApi.saveRoute(routeId, routeOptionId || undefined);
-        Alert.alert("성공", "경로가 북마크되었습니다!");
-      }
+      await savedRouteApi.saveRoute(
+        routeId,
+        routeOptionId || undefined,
+        editRouteName.trim() || undefined,
+      );
+      Alert.alert("성공", "경로가 저장되었습니다!");
     } catch (error) {
-      // 실패 시 롤백
-      setIsBookmarked(wasBookmarked);
-      console.error("북마크 토글 실패:", error);
-      Alert.alert("오류", "북마크 변경에 실패했습니다. 다시 시도해주세요.");
+      setIsBookmarked(false);
+      console.error("경로 저장 실패:", error);
+      Alert.alert("오류", "경로 저장에 실패했습니다. 다시 시도해주세요.");
     }
   };
 
@@ -422,6 +453,57 @@ export default function ResultScreen() {
           <PrimaryButton onPress={handleGoHome}>홈으로 돌아가기</PrimaryButton>
         </Animated.View>
       </View>
+
+      {/* 이름 수정 모달 */}
+      <Modal
+        visible={isNameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsNameModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsNameModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>경로 이름 수정</Text>
+                <Text style={styles.modalSubtitle}>
+                  저장할 경로의 이름을 입력해주세요
+                </Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={editRouteName}
+                  onChangeText={setEditRouteName}
+                  placeholder="경로 이름 입력"
+                  placeholderTextColor={Colors.zinc[500]}
+                  maxLength={50}
+                  autoFocus
+                  selectTextOnFocus
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalCancelButton}
+                    onPress={() => setIsNameModalVisible(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalCancelText}>취소</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalConfirmButton,
+                      !editRouteName.trim() && styles.modalConfirmDisabled,
+                    ]}
+                    onPress={handleConfirmSave}
+                    activeOpacity={0.7}
+                    disabled={!editRouteName.trim()}
+                  >
+                    <Text style={styles.modalConfirmText}>저장</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </ScrollView>
   );
 }
@@ -649,5 +731,77 @@ const styles = StyleSheet.create({
   iconButtonText: {
     fontSize: FontSize.base,
     color: Colors.zinc[50],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius["2xl"],
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    padding: Spacing.xl,
+  },
+  modalTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+    marginBottom: Spacing.xs,
+  },
+  modalSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+    marginBottom: Spacing.lg,
+  },
+  modalInput: {
+    backgroundColor: Colors.zinc[800],
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[50],
+    marginBottom: Spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  modalCancelButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    backgroundColor: Colors.zinc[800],
+  },
+  modalCancelText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[400],
+  },
+  modalConfirmButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.emerald[500],
+  },
+  modalConfirmDisabled: {
+    opacity: 0.4,
+  },
+  modalConfirmText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: "#fff",
   },
 });
