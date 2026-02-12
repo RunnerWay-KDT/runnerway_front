@@ -42,7 +42,8 @@ interface RouteOption {
   safety: number;
   elevation: number;
   lighting: number;
-  convenience: number;
+  cafeCount?: number;
+  convenienceCount?: number;
   difficulty: string;
   tag: string | null;
   // 경로 옵션 ID
@@ -81,7 +82,7 @@ export default function RoutePreviewScreen() {
         safety: 95,
         elevation: 10,
         lighting: 92,
-        convenience: 5,
+        convenienceCount: 5,
         difficulty: "쉬움",
         tag: fromSaved ? null : "추천",
       },
@@ -96,7 +97,7 @@ export default function RoutePreviewScreen() {
         safety: 88,
         elevation: 12,
         lighting: 87,
-        convenience: 3,
+        convenienceCount: 3,
         difficulty: "보통",
         tag: fromSaved ? null : "BEST",
       },
@@ -111,7 +112,7 @@ export default function RoutePreviewScreen() {
         safety: 84,
         elevation: 18,
         lighting: 80,
-        convenience: 2,
+        convenienceCount: 2,
         difficulty: "도전",
         tag: null,
       },
@@ -157,6 +158,9 @@ export default function RoutePreviewScreen() {
                 tag: string | null;
                 coordinates: Array<{ lat: number; lng: number }>;
                 scores?: { safety?: number; elevation?: number };
+                place_ids?: { cafe?: number[]; convenience?: number[] };
+                cafe_count?: number;
+                convenience_count?: number;
               }>;
             };
           }
@@ -178,7 +182,8 @@ export default function RoutePreviewScreen() {
           elevation: opt.scores?.elevation ?? 0,
           lighting: (opt.scores as { lighting?: number })?.lighting ?? 0,
           sidewalk: (opt.scores as { sidewalk?: number })?.sidewalk ?? 0,
-          convenience: 0,
+          cafeCount: opt.cafe_count ?? 0,
+          convenienceCount: opt.convenience_count ?? 0,
           difficulty: opt.difficulty ?? "보통",
           tag: opt.tag ?? null,
           optionId: opt.id,
@@ -623,25 +628,13 @@ export default function RoutePreviewScreen() {
                   <View style={styles.facilityCard}>
                     <Text style={styles.facilityLabel}>편의점</Text>
                     <Text style={styles.facilityValue}>
-                      {selectedRoute.convenience}곳
+                      {selectedRoute.convenienceCount}곳
                     </Text>
                   </View>
                   <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>화장실</Text>
+                    <Text style={styles.facilityLabel}>카페</Text>
                     <Text style={styles.facilityValue}>
-                      {Math.ceil(selectedRoute.convenience / 2)}곳
-                    </Text>
-                  </View>
-                  <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>음수대</Text>
-                    <Text style={styles.facilityValue}>
-                      {selectedRoute.convenience + 2}곳
-                    </Text>
-                  </View>
-                  <View style={styles.facilityCard}>
-                    <Text style={styles.facilityLabel}>CCTV</Text>
-                    <Text style={styles.facilityValue}>
-                      {Math.round(selectedRoute.safety / 5)}대
+                      {selectedRoute.cafeCount}곳
                     </Text>
                   </View>
                 </View>

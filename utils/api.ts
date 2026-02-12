@@ -539,6 +539,12 @@ export const routeApi = {
     return apiClient.get(`/api/v1/routes/${routeId}/options`);
   },
 
+  async getOptionPlaces(routeId: string, optionId: string) {
+    return apiClient.get<{ success: boolean; data: { places: Array<{ id: string; name: string; category: string; lat: number; lng: number }> } }>(
+      `/api/v1/routes/${routeId}/options/${optionId}/places`
+    );
+  },
+
   /**
    * 경로 추천 요청 (GPT + OSMNX)
    */
