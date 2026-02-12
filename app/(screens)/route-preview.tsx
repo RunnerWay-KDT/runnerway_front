@@ -153,6 +153,27 @@ export default function RoutePreviewScreen() {
       return () => { cancelled = true; }
   }, [routeId, selectedRoute?.optionId]);
 
+  type PlaceMarkerFilter = "all" | "cafe" | "convenience" | "none";
+  const [placeMarkerFilter, setPlaceMarkerFilter] = useState<PlaceMarkerFilter>("all");
+
+  const filteredPlaceMarkers = (() => {
+    if (placeMarkerFilter === "none") return [];
+    return optionPlaces
+      .filter((p) => {
+        if (placeMarkerFilter === "all") return true;
+        if (placeMarkerFilter === "cafe") return p.category === "cafe";
+        if (placeMarkerFilter === "convenience") return p.category === "convenience";
+        return false;
+      })
+      .map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        title: p.name,
+        icon: p.category === "cafe" ? "cafe" : "convenience",
+        color: p.category === "cafe" ? "#8B4512" : "#2563eb",
+      }));
+  })();
+
   useEffect(() => {
     if (!routeId) {
       setSelectedRoute(fallbackOptions[1]);
@@ -309,22 +330,56 @@ export default function RoutePreviewScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Map */}
-      <KakaoMap
-        key={mapPolyline.length > 0 ? "path" : "preset"}
-        routePath={iconName}
-        polyline={mapPolyline}
-        center={mapCenter}
-        startPosition={startPosition}
-        isLoading={!selectedRoute || optionsLoading}
-        markers={optionPlaces.map((p) => ({
-          lat: p.lat,
-          lng: p.lng,
-          title: p.name,
-          icon: p.category === "cafe" ? "cafe" : "convenience",
-          color: p.category === "cafe" ? "#8B4512" : "#2563eb",
-        }))}
-      />
+      {/* Background Map + 마커 필터 버튼 */}
+      <View style={styles.mapWrapper}>
+        <KakaoMap
+          key={mapPolyline.length > 0 ? "path" : "preset"}
+          routePath={iconName}
+          polyline={mapPolyline}
+          center={mapCenter}
+          startPosition={startPosition}
+          isLoading={!selectedRoute || optionsLoading}
+          markers={filteredPlaceMarkers}
+        />
+        <View style={styles.placeFilterButtons} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "convenience" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "convenience" ? "all" : "convenience"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>🏪</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "cafe" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "cafe" ? "all" : "cafe"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>☕</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.placeFilterBtn,
+              placeMarkerFilter === "none" && styles.placeFilterBtnActive,
+            ]}
+            onPress={() =>
+              setPlaceMarkerFilter((prev) => (prev === "none" ? "all" : "none"))
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.placeFilterBtnEmoji}>⊘</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Header */}
       <View style={styles.header}>
@@ -999,5 +1054,36 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
+  },
+  mapWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  placeFilterButtons: {
+    position: "absolute",
+    top: 100,
+    right: Spacing.md,
+    flexDirection: "column",
+    gap: Spacing.sm,
+    zIndex: 10,
+  },
+  placeFilterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  placeFilterBtnActive: {
+    backgroundColor: Colors.emerald[500],
+  },
+  placeFilterBtnEmoji: {
+    fontSize: 20,
   },
 });
