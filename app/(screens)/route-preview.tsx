@@ -134,6 +134,25 @@ export default function RoutePreviewScreen() {
     routeId ? null : fallbackOptions[1],
   );
 
+  const [optionPlaces, setOptionPlaces] = useState<{ lat: number; lng: number; name: string; category: string }[]>([]);
+
+  useEffect(() => {
+    if (!routeId || !selectedRoute?.optionId) {
+      setOptionPlaces([]);
+      return;
+    } 
+    let cancelled = false;
+    routeApi
+      .getOptionPlaces(routeId, selectedRoute.optionId)
+      .then((res: unknown) => {
+        if (cancelled) return;
+        const data = (res as { data?: { places?: Array<{ lat: number; lng: number; name: string; category: string }>}})?.data;
+        setOptionPlaces(data?.places ?? []);
+      })
+      .catch(() => setOptionPlaces([]));
+      return () => { cancelled = true; }
+  }, [routeId, selectedRoute?.optionId]);
+
   useEffect(() => {
     if (!routeId) {
       setSelectedRoute(fallbackOptions[1]);
@@ -298,6 +317,13 @@ export default function RoutePreviewScreen() {
         center={mapCenter}
         startPosition={startPosition}
         isLoading={!selectedRoute || optionsLoading}
+        markers={optionPlaces.map((p) => ({
+          lat: p.lat,
+          lng: p.lng,
+          title: p.name,
+          icon: p.category === "cafe" ? "cafe" : "convenience",
+          color: p.category === "cafe" ? "#8B4512" : "#2563eb",
+        }))}
       />
 
       {/* Header */}
