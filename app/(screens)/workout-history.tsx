@@ -6,6 +6,7 @@ import {
   Clock,
   Flame,
   MapPin,
+  Pencil,
   Trash2,
   TrendingUp,
 } from "lucide-react-native";
@@ -14,10 +15,13 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
@@ -34,7 +38,7 @@ import {
   Spacing,
 } from "../../constants/theme";
 import { getIconComponent } from "../../utils/shapeIcons";
-import { workoutApi, savedRouteApi } from "../../utils/api";
+import { workoutApi, savedRouteApi, routeApi } from "../../utils/api";
 import type { WorkoutSummary } from "../../types/api";
 
 // 운동 기록을 화면에 맞게 변환한 인터페이스
@@ -105,6 +109,7 @@ type SortOrder = "latest" | "oldest";
 export default function WorkoutHistoryScreen() {
   const router = useRouter();
   const [workouts, setWorkouts] = useState<WorkoutRecord[]>([]);
+  const rawWorkoutsRef = useRef<WorkoutRecord[]>([]); // 원본 데이터 캐시 (정렬 시 재요청 방지)
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,26 +122,53 @@ export default function WorkoutHistoryScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  /** 운동 기록 목록 로드 */
-  const loadWorkouts = useCallback(
-    async (sort: SortOrder = sortOrder) => {
-      try {
-        const response = await workoutApi.getWorkoutHistory({
-          page: 1,
-          limit: 50,
-          sort: sort === "latest" ? "date_desc" : "date_asc",
-        });
-
-        if (response.success && response.data) {
-          const records = response.data.workouts.map(toWorkoutRecord);
-          setWorkouts(records);
-        }
-      } catch (error) {
-        console.error("운동 기록 조회 실패:", error);
-      }
-    },
-    [sortOrder],
+  // 이름 수정 모달 상태
+  const [isNameModalVisible, setIsNameModalVisible] = useState(false);
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutRecord | null>(
+    null,
   );
+  const [editRouteName, setEditRouteName] = useState("");
+
+  /** 클라이언트 사이드 정렬 (네트워크 요청 없음) */
+  const sortWorkouts = useCallback(
+    (items: WorkoutRecord[], sort: SortOrder): WorkoutRecord[] => {
+      const sorted = [...items];
+      if (sort === "latest") {
+        sorted.sort(
+          (a, b) =>
+            new Date(b.completedAt).getTime() -
+            new Date(a.completedAt).getTime(),
+        );
+      } else {
+        // oldest
+        sorted.sort(
+          (a, b) =>
+            new Date(a.completedAt).getTime() -
+            new Date(b.completedAt).getTime(),
+        );
+      }
+      return sorted;
+    },
+    [],
+  );
+
+  /** 운동 기록 목록 로드 (서버에서 1회 fetch → 로컬 캐시) */
+  const loadWorkouts = useCallback(async () => {
+    try {
+      const response = await workoutApi.getWorkoutHistory({
+        page: 1,
+        limit: 50,
+      });
+
+      if (response.success && response.data) {
+        const records = response.data.workouts.map(toWorkoutRecord);
+        rawWorkoutsRef.current = records;
+        setWorkouts(sortWorkouts(records, sortOrder));
+      }
+    } catch (error) {
+      console.error("운동 기록 조회 실패:", error);
+    }
+  }, [sortOrder, sortWorkouts]);
 
   // 최초 로드
   useEffect(() => {
@@ -177,9 +209,10 @@ export default function WorkoutHistoryScreen() {
   };
 
   const toggleSortOrder = () => {
-    const newOrder = sortOrder === "latest" ? "oldest" : "latest";
+    const newOrder: SortOrder = sortOrder === "latest" ? "oldest" : "latest";
     setSortOrder(newOrder);
-    loadWorkouts(newOrder);
+    // 서버 재요청 없이 로컬 캐시로 즉시 정렬
+    setWorkouts(sortWorkouts(rawWorkoutsRef.current, newOrder));
   };
 
   const handleRefresh = async () => {
@@ -206,7 +239,10 @@ export default function WorkoutHistoryScreen() {
 
     const wasBookmarked = workout.isBookmarked;
 
-    // 낙관적 업데이트
+    // 낙관적 업데이트 (캐시 동기화)
+    rawWorkoutsRef.current = rawWorkoutsRef.current.map((w) =>
+      w.id === workout.id ? { ...w, isBookmarked: !wasBookmarked } : w,
+    );
     setWorkouts((prev) =>
       prev.map((w) =>
         w.id === workout.id ? { ...w, isBookmarked: !wasBookmarked } : w,
@@ -224,6 +260,9 @@ export default function WorkoutHistoryScreen() {
       }
     } catch (error) {
       // 실패 시 롤백
+      rawWorkoutsRef.current = rawWorkoutsRef.current.map((w) =>
+        w.id === workout.id ? { ...w, isBookmarked: wasBookmarked } : w,
+      );
       setWorkouts((prev) =>
         prev.map((w) =>
           w.id === workout.id ? { ...w, isBookmarked: wasBookmarked } : w,
@@ -251,6 +290,9 @@ export default function WorkoutHistoryScreen() {
             try {
               const response = await workoutApi.deleteWorkoutRecord(workout.id);
               if (response.success) {
+                rawWorkoutsRef.current = rawWorkoutsRef.current.filter(
+                  (w) => w.id !== workout.id,
+                );
                 setWorkouts((prev) => prev.filter((w) => w.id !== workout.id));
               }
             } catch (error) {
@@ -266,6 +308,50 @@ export default function WorkoutHistoryScreen() {
     );
   };
 
+  /** 이름 수정 시작 (왼쪽 스와이프 버튼) */
+  const handleStartRename = (workout: WorkoutRecord) => {
+    swipeableRefs.current.get(workout.id)?.close();
+    setEditingWorkout(workout);
+    setEditRouteName(workout.routeName);
+    setIsNameModalVisible(true);
+  };
+
+  /** 이름 수정 확인 */
+  const handleConfirmRename = async () => {
+    if (!editingWorkout?.routeId || !editRouteName.trim()) return;
+
+    const newName = editRouteName.trim();
+    const prevName = editingWorkout.routeName;
+    const workoutId = editingWorkout.id;
+
+    setIsNameModalVisible(false);
+
+    // 낙관적 업데이트 (캐시 동기화)
+    rawWorkoutsRef.current = rawWorkoutsRef.current.map((w) =>
+      w.id === workoutId ? { ...w, routeName: newName } : w,
+    );
+    setWorkouts((prev) =>
+      prev.map((w) => (w.id === workoutId ? { ...w, routeName: newName } : w)),
+    );
+
+    try {
+      await routeApi.updateRouteName(editingWorkout.routeId, newName);
+    } catch (error) {
+      // 실패 시 롤백
+      rawWorkoutsRef.current = rawWorkoutsRef.current.map((w) =>
+        w.id === workoutId ? { ...w, routeName: prevName } : w,
+      );
+      setWorkouts((prev) =>
+        prev.map((w) =>
+          w.id === workoutId ? { ...w, routeName: prevName } : w,
+        ),
+      );
+      console.error("이름 수정 실패:", error);
+      Alert.alert("오류", "이름 수정에 실패했습니다. 다시 시도해주세요.");
+    }
+    setEditingWorkout(null);
+  };
+
   /** 스와이프 시 오른쪽에 나타나는 삭제 버튼 */
   const renderRightActions = (workout: WorkoutRecord) => {
     return (
@@ -279,6 +365,25 @@ export default function WorkoutHistoryScreen() {
             <Trash2 size={20} color="#f87171" />
           </View>
           <Text style={styles.deleteActionText}>삭제</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  /** 스와이프 시 왼쪽에 나타나는 이름 수정 버튼 */
+  const renderLeftActions = (workout: WorkoutRecord) => {
+    if (!workout.routeId) return null;
+    return (
+      <TouchableOpacity
+        style={styles.editAction}
+        activeOpacity={0.7}
+        onPress={() => handleStartRename(workout)}
+      >
+        <View style={styles.editActionContent}>
+          <View style={styles.editIconContainer}>
+            <Pencil size={20} color={Colors.blue[400]} />
+          </View>
+          <Text style={styles.editActionText}>이름 수정</Text>
         </View>
       </TouchableOpacity>
     );
@@ -308,7 +413,9 @@ export default function WorkoutHistoryScreen() {
             }
           }}
           renderRightActions={() => renderRightActions(item)}
+          renderLeftActions={() => renderLeftActions(item)}
           overshootRight={false}
+          overshootLeft={false}
           friction={2}
         >
           <TouchableOpacity
@@ -515,6 +622,57 @@ export default function WorkoutHistoryScreen() {
         workout={selectedWorkout}
         workoutId={selectedWorkoutId}
       />
+
+      {/* 이름 수정 모달 */}
+      <Modal
+        visible={isNameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsNameModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsNameModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>경로 이름 수정</Text>
+                <Text style={styles.modalSubtitle}>
+                  새로운 이름을 입력해주세요
+                </Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={editRouteName}
+                  onChangeText={setEditRouteName}
+                  placeholder="경로 이름"
+                  placeholderTextColor={Colors.zinc[600]}
+                  maxLength={50}
+                  autoFocus
+                  selectTextOnFocus
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalCancelButton}
+                    onPress={() => setIsNameModalVisible(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalCancelText}>취소</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalConfirmButton,
+                      !editRouteName.trim() && styles.modalConfirmDisabled,
+                    ]}
+                    onPress={handleConfirmRename}
+                    activeOpacity={0.7}
+                    disabled={!editRouteName.trim()}
+                  >
+                    <Text style={styles.modalConfirmText}>확인</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -718,5 +876,101 @@ const styles = StyleSheet.create({
     color: "#f87171",
     fontSize: FontSize.xs,
     fontWeight: FontWeight.medium,
+  },
+  editAction: {
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 88,
+  },
+  editActionContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  editIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: "rgba(59, 130, 246, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editActionText: {
+    color: Colors.blue[400],
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.medium,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius["2xl"],
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    padding: Spacing.xl,
+  },
+  modalTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+    marginBottom: Spacing.xs,
+  },
+  modalSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+    marginBottom: Spacing.lg,
+  },
+  modalInput: {
+    backgroundColor: Colors.zinc[800],
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    fontSize: FontSize.base,
+    color: Colors.zinc[50],
+    marginBottom: Spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  modalCancelButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    backgroundColor: Colors.zinc[800],
+  },
+  modalCancelText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[400],
+  },
+  modalConfirmButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.emerald[500],
+  },
+  modalConfirmDisabled: {
+    opacity: 0.4,
+  },
+  modalConfirmText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: "#fff",
   },
 });

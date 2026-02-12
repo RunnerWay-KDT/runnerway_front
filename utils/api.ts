@@ -442,6 +442,15 @@ export const userApi = {
 
 export const routeApi = {
   /**
+   * 경로 이름 수정 → PATCH /api/v1/routes/{route_id}/name
+   */
+  async updateRouteName(routeId: string, name: string): Promise<ApiResponse> {
+    return apiClient.patch<ApiResponse>(`/api/v1/routes/${routeId}/name`, {
+      name,
+    });
+  },
+
+  /**
    * 커스텀 그림 경로 저장
    */
   async saveCustomDrawing(data: {

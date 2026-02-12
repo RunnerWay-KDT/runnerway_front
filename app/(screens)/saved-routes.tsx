@@ -82,36 +82,52 @@ type SortOrder = "recent" | "distance" | "safety";
 export default function SavedRoutesScreen() {
   const router = useRouter();
   const [routes, setRoutes] = useState<SavedRouteItem[]>([]);
+  const rawRoutesRef = useRef<SavedRouteItem[]>([]); // 원본 데이터 캐시 (정렬 시 재요청 방지)
   const [sortOrder, setSortOrder] = useState<SortOrder>("recent");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  /** 저장한 경로 목록 로드 */
-  const loadRoutes = useCallback(
-    async (sort: SortOrder = sortOrder) => {
-      try {
-        const sortMap: Record<SortOrder, string> = {
-          recent: "date_desc",
-          distance: "distance_desc",
-          safety: "safety_desc",
-        };
-        const response = await savedRouteApi.getSavedRoutes({
-          page: 1,
-          limit: 50,
-          sort: sortMap[sort],
-        });
-
-        if (response.success && response.data) {
-          const items = response.data.routes.map(toSavedRouteItem);
-          setRoutes(items);
-        }
-      } catch (error) {
-        console.error("저장한 경로 조회 실패:", error);
+  /** 클라이언트 사이드 정렬 (네트워크 요청 없음) */
+  const sortRoutes = useCallback(
+    (items: SavedRouteItem[], sort: SortOrder): SavedRouteItem[] => {
+      const sorted = [...items];
+      switch (sort) {
+        case "recent":
+          sorted.sort(
+            (a, b) =>
+              new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime(),
+          );
+          break;
+        case "distance":
+          sorted.sort((a, b) => b.distance - a.distance);
+          break;
+        case "safety":
+          sorted.sort((a, b) => b.safetyScore - a.safetyScore);
+          break;
       }
+      return sorted;
     },
-    [sortOrder],
+    [],
   );
+
+  /** 저장한 경로 목록 로드 (서버에서 1회 fetch → 로컬 캐시) */
+  const loadRoutes = useCallback(async () => {
+    try {
+      const response = await savedRouteApi.getSavedRoutes({
+        page: 1,
+        limit: 50,
+      });
+
+      if (response.success && response.data) {
+        const items = response.data.routes.map(toSavedRouteItem);
+        rawRoutesRef.current = items;
+        setRoutes(sortRoutes(items, sortOrder));
+      }
+    } catch (error) {
+      console.error("저장한 경로 조회 실패:", error);
+    }
+  }, [sortOrder, sortRoutes]);
 
   // 최초 로드
   useEffect(() => {
@@ -151,16 +167,15 @@ export default function SavedRoutesScreen() {
   };
 
   const toggleSortOrder = () => {
-    let newOrder: SortOrder;
-    if (sortOrder === "recent") {
-      newOrder = "distance";
-    } else if (sortOrder === "distance") {
-      newOrder = "safety";
-    } else {
-      newOrder = "recent";
-    }
+    const newOrder: SortOrder =
+      sortOrder === "recent"
+        ? "distance"
+        : sortOrder === "distance"
+          ? "safety"
+          : "recent";
     setSortOrder(newOrder);
-    loadRoutes(newOrder);
+    // 서버 재요청 없이 로컬 캐시로 즉시 정렬
+    setRoutes(sortRoutes(rawRoutesRef.current, newOrder));
   };
 
   const getSortLabel = () => {
@@ -192,6 +207,9 @@ export default function SavedRoutesScreen() {
             try {
               const response = await savedRouteApi.unsaveRoute(item.routeId);
               if (response.success) {
+                rawRoutesRef.current = rawRoutesRef.current.filter(
+                  (r) => r.id !== item.id,
+                );
                 setRoutes((prev) => prev.filter((r) => r.id !== item.id));
               }
             } catch (error) {
