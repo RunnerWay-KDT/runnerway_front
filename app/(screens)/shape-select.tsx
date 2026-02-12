@@ -8,12 +8,23 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
+import { getPresetSvgPath, SHAPE_LIST } from "../../constants/presetShapes";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Heart,
   Star,
   Coffee,
   Smile,
+  Circle,
+  Triangle,
+  Pentagon,
+  Diamond,
+  X, // Cross
+  Shield,
+  Zap,
+  Bookmark,
+  TrendingUp, // For Stairs
   Dog,
   Cat,
   Pencil,
@@ -53,61 +64,48 @@ export default function ShapeSelectScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedPathData, setSavedPathData] = useState<string>("");
 
-  const shapes: Shape[] = [
-    {
-      id: "heart",
-      name: "하트",
-      Icon: Heart,
-      iconName: "heart",
-      distance: "4.2km",
-      colors: [Colors.pink[500], Colors.red[500]],
-    },
-    {
-      id: "star",
-      name: "별",
-      Icon: Star,
-      iconName: "star",
-      distance: "5.8km",
-      colors: [Colors.amber[500], Colors.amber[600]],
-    },
-    {
-      id: "coffee",
-      name: "커피",
-      Icon: Coffee,
-      iconName: "coffee",
-      distance: "3.5km",
-      colors: [Colors.amber[600], Colors.orange[600]],
-    },
-    {
-      id: "smile",
-      name: "스마일",
-      Icon: Smile,
-      iconName: "smile",
-      distance: "4.0km",
-      colors: [Colors.amber[400], Colors.orange[400]],
-    },
-  ];
+  // Helper to map icon names (from DB) to Lucide icons
+  const getIconComponent = (iconName: string) => {
+    const map: { [key: string]: any } = {
+        heart: Heart,
+        star: Star,
+        circle: Circle,
+        triangle: Triangle,
+        pentagon: Pentagon,
+        diamond: Diamond,
+        cross: X,
+        shield: Shield,
+        zap: Zap,
+        bookmark: Bookmark,
+        stairs: TrendingUp,
+        coffee: Coffee,
+        smile: Smile,
+        dog: Dog,
+        cat: Cat,
+        default: Shapes
+    };
+    return map[iconName?.toLowerCase()] || map.default;
+  };
 
-  const animals: Shape[] = [
-    {
-      id: "dog",
-      name: "강아지",
-      Icon: Dog,
-      iconName: "dog",
-      distance: "6.2km",
-      colors: [Colors.blue[500], Colors.blue[600]],
-    },
-    {
-      id: "cat",
-      name: "고양이",
-      Icon: Cat,
-      iconName: "cat",
-      distance: "5.5km",
-      colors: [Colors.purple[500], Colors.pink[500]],
-    },
-  ];
+  // Helper to get colors (can be static or dynamic)
+  const getShapeColors = (category: string, index: number): [string, string] => {
+      // Logic for colors based on category
+      if (category === 'animal') {
+          return [Colors.blue[500], Colors.blue[600]];
+      }
+      // Alternate colors for shapes
+      if (index % 2 === 0) return [Colors.pink[500], Colors.red[500]];
+      return [Colors.amber[500], Colors.orange[500]];
+  };
 
-  const allShapes = [...shapes, ...animals];
+  const allShapes = SHAPE_LIST.map((item, index) => ({
+    ...item,
+    Icon: getIconComponent(item.iconName),
+    colors: getShapeColors(item.category ?? 'shape', index),
+  }));
+
+  const shapes = allShapes.filter((s) => s.category === "shape");
+  const animals = allShapes.filter((s) => s.category === "animal");
 
   const handlePresetSelect = (shapeId: string) => {
     setSelectedShape(shapeId);
@@ -181,10 +179,31 @@ export default function ShapeSelectScreen() {
     setHasCustomDrawing(hasDrawing);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (activeMainTab === "presets" && selectedShape) {
       const selected = allShapes.find((s) => s.id === selectedShape);
       if (selected) {
+        let startLat = params.startLat;
+        let startLng = params.startLng;
+
+        // If location is missing from params, try to get current location
+        if (!startLat || !startLng) {
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") {
+              Alert.alert("알림", "위치 권한이 필요합니다.");
+              return;
+            }
+            const location = await Location.getCurrentPositionAsync({});
+            startLat = location.coords.latitude.toString();
+            startLng = location.coords.longitude.toString();
+          } catch (error) {
+            console.error("Location error:", error);
+            Alert.alert("알림", "현재 위치를 가져올 수 없습니다.");
+            return;
+          }
+        }
+
         router.push({
           pathname: "/(screens)/drawing-setup",
           params: {
@@ -193,8 +212,9 @@ export default function ShapeSelectScreen() {
             shapeName: selected.name,
             shapeIconName: selected.iconName,
             shapeDistance: selected.distance,
-            startLat: params.startLat,
-            startLng: params.startLng,
+            startLat: startLat,
+            startLng: startLng,
+            svgPath: selected.svgPath || getPresetSvgPath(selected.iconName), // Pass Frontend SVG
           },
         });
       }
