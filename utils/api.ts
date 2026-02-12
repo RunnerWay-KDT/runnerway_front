@@ -777,5 +777,33 @@ export const savedRouteApi = {
   },
 };
 
+// ============================================
+// 커뮤니티 API
+// ============================================
+export const communityApi = {
+  /**
+   * 게시물 작성 → POST /api/v1/community/posts
+   */
+  async createPost(data: {
+    workout_id?: string;
+    route_name: string;
+    shape_id?: string;
+    shape_name?: string;
+    shape_icon?: string;
+    distance: number;
+    duration: number;
+    pace?: string;
+    calories?: number;
+    caption?: string;
+    visibility?: string;
+    location?: string;
+  }): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(
+      API_CONFIG.ENDPOINTS.COMMUNITY.POSTS,
+      data,
+    );
+  },
+};
+
 // 기본 내보내기
 export default apiClient;

@@ -1,12 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as MediaLibrary from "expo-media-library";
 import {
   Bookmark,
   Clock,
+  Download,
   Flame,
+  MessageSquare,
   Share2,
   Sparkles,
   TrendingUp,
   Trophy,
+  X,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -21,6 +25,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
+import ViewShot from "react-native-view-shot";
 import { KakaoMap } from "../../components/KakaoMap";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import {
@@ -30,12 +35,13 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { workoutApi, savedRouteApi } from "../../utils/api";
+import { workoutApi, savedRouteApi, communityApi } from "../../utils/api";
 
 export default function ResultScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const hasCalledCompleteApi = useRef(false);
+  const viewShotRef = useRef<ViewShot>(null);
 
   const isCustomDrawing = params.mode === "custom";
   const iconName = (params.shapeIconName as string) || "heart";
@@ -58,6 +64,10 @@ export default function ResultScreen() {
   // workout.tsx에서 전달받은 planned path (routePolyline 파라미터)
   const routePolylineRaw = (params.routePolyline as string) || "[]";
 
+  // 도형 정보
+  const shapeId = (params.shapeId as string) || "";
+  const shapeName = (params.shapeName as string) || "";
+
   // 북마크 상태
   const [isBookmarked, setIsBookmarked] = useState(false);
 
@@ -66,6 +76,17 @@ export default function ResultScreen() {
   const [editRouteName, setEditRouteName] = useState(
     (params.routeName as string) || (params.shapeName as string) || "내 경로",
   );
+
+  // 공유 선택 모달 상태
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+
+  // 게시물 작성 모달 상태
+  const [isPostModalVisible, setIsPostModalVisible] = useState(false);
+  const [postCaption, setPostCaption] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
+
+  // 운동 완료 API 호출 완료 대기용 Promise
+  const workoutCompletePromiseRef = useRef<Promise<void> | null>(null);
 
   // 경로 비교를 위한 state
   const [plannedPath, setPlannedPath] = useState<
@@ -188,7 +209,7 @@ export default function ResultScreen() {
       }
     };
 
-    completeWorkout();
+    workoutCompletePromiseRef.current = completeWorkout();
   }, [
     workoutId,
     distance,
@@ -234,6 +255,77 @@ export default function ResultScreen() {
 
   const handleGoHome = () => {
     router.replace("/(tabs)");
+  };
+
+  /** 공유 버튼 클릭 → 공유 선택 모달 표시 */
+  const handleSharePress = () => {
+    setIsShareModalVisible(true);
+  };
+
+  /** 이미지 저장 (화면 캡처 → 갤러리 저장) */
+  const handleSaveImage = async () => {
+    setIsShareModalVisible(false);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "권한 필요",
+          "이미지를 저장하려면 사진 접근 권한이 필요합니다.",
+        );
+        return;
+      }
+
+      if (viewShotRef.current?.capture) {
+        const uri = await viewShotRef.current.capture();
+        await MediaLibrary.saveToLibraryAsync(uri);
+        Alert.alert("저장 완료", "운동 결과가 갤러리에 저장되었습니다!");
+      }
+    } catch (error) {
+      console.error("이미지 저장 실패:", error);
+      Alert.alert("오류", "이미지 저장에 실패했습니다. 다시 시도해주세요.");
+    }
+  };
+
+  /** 게시물 올리기 선택 → 게시물 작성 모달 표시 */
+  const handlePostSelect = () => {
+    setIsShareModalVisible(false);
+    setPostCaption("");
+    setIsPostModalVisible(true);
+  };
+
+  /** 게시물 작성 확인 */
+  const handleConfirmPost = async () => {
+    setIsPosting(true);
+    try {
+      // 운동 완료 API가 아직 진행 중이면 완료될 때까지 대기
+      if (workoutCompletePromiseRef.current) {
+        await workoutCompletePromiseRef.current;
+      }
+
+      const response = await communityApi.createPost({
+        workout_id: workoutId || undefined,
+        route_name: editRouteName.trim() || "내 경로",
+        shape_id: shapeId || undefined,
+        shape_name: shapeName || undefined,
+        shape_icon: iconName || undefined,
+        distance: parseFloat(distance),
+        duration: time,
+        pace: pace || undefined,
+        calories: calories || undefined,
+        caption: postCaption.trim() || undefined,
+        visibility: "public",
+      });
+
+      if (response.success) {
+        setIsPostModalVisible(false);
+        Alert.alert("성공", "게시물이 커뮤니티에 공유되었습니다!");
+      }
+    } catch (error) {
+      console.error("게시물 작성 실패:", error);
+      Alert.alert("오류", "게시물 작성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   /** 저장 버튼 클릭 → 이름 입력 모달 표시 또는 북마크 해제 */
@@ -286,130 +378,138 @@ export default function ResultScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Trophy Header */}
-      <Animated.View
-        entering={ZoomIn.delay(200).duration(400)}
-        style={styles.trophyContainer}
+      <ViewShot
+        ref={viewShotRef}
+        options={{ format: "png", quality: 1.0 }}
+        style={styles.viewShotContainer}
       >
-        <Trophy size={64} color={Colors.emerald[400]} />
-      </Animated.View>
+        {/* Trophy Header */}
+        <Animated.View
+          entering={ZoomIn.delay(200).duration(400)}
+          style={styles.trophyContainer}
+        >
+          <Trophy size={64} color={Colors.emerald[400]} />
+        </Animated.View>
 
-      <Animated.Text
-        entering={FadeInUp.delay(300).duration(400)}
-        style={styles.title}
-      >
-        운동 완료!
-      </Animated.Text>
-      <Animated.Text
-        entering={FadeInUp.delay(400).duration(400)}
-        style={styles.subtitle}
-      >
-        훌륭한 러닝이었습니다
-      </Animated.Text>
+        <Animated.Text
+          entering={FadeInUp.delay(300).duration(400)}
+          style={styles.title}
+        >
+          운동 완료!
+        </Animated.Text>
+        <Animated.Text
+          entering={FadeInUp.delay(400).duration(400)}
+          style={styles.subtitle}
+        >
+          훌륭한 러닝이었습니다
+        </Animated.Text>
 
-      {/* Map Section - 계획 경로 vs 실제 경로 비교 */}
-      <Animated.View
-        entering={FadeInUp.delay(450).duration(400)}
-        style={styles.mapContainer}
-      >
-        <KakaoMap
-          routePath={iconName}
-          plannedPath={plannedPath.length > 0 ? plannedPath : undefined}
-          actualPath={actualPath.length > 0 ? actualPath : undefined}
-        />
-        {/* 경로 범례 */}
-        {(plannedPath.length > 0 || actualPath.length > 0) && (
-          <View style={styles.mapLegend}>
-            {plannedPath.length > 0 && (
-              <View style={styles.legendItem}>
-                <View style={[styles.legendLine, styles.legendPlanned]} />
-                <Text style={styles.legendText}>계획 경로</Text>
-              </View>
-            )}
-            {actualPath.length > 0 && (
-              <View style={styles.legendItem}>
-                <View style={[styles.legendLine, styles.legendActual]} />
-                <Text style={styles.legendText}>실제 경로</Text>
-              </View>
-            )}
-          </View>
-        )}
-        {/* 완주율 뱃지 */}
-        {routeCompletion > 0 && (
-          <View style={styles.completionBadge}>
-            <Text style={styles.completionText}>
-              완주율 {Math.round(routeCompletion)}%
-            </Text>
-          </View>
-        )}
-      </Animated.View>
-
-      {/* Distance Badge */}
-      <Animated.View
-        entering={FadeInUp.delay(500).duration(400)}
-        style={styles.distanceBadgeContainer}
-      >
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceText}>{distance} km</Text>
-        </View>
-      </Animated.View>
-
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        {stats.map((stat, index) => {
-          const Icon = stat.Icon;
-          return (
-            <Animated.View
-              key={stat.label}
-              entering={FadeInUp.delay(600 + index * 100).duration(400)}
-              style={styles.statCard}
-            >
-              <Icon size={24} color={stat.color} />
-              <Text style={styles.statLabel}>{stat.label}</Text>
-              <Text style={styles.statValue}>
-                {stat.value}
-                {stat.unit && <Text style={styles.statUnit}> {stat.unit}</Text>}
+        {/* Map Section - 계획 경로 vs 실제 경로 비교 */}
+        <Animated.View
+          entering={FadeInUp.delay(450).duration(400)}
+          style={styles.mapContainer}
+        >
+          <KakaoMap
+            routePath={iconName}
+            plannedPath={plannedPath.length > 0 ? plannedPath : undefined}
+            actualPath={actualPath.length > 0 ? actualPath : undefined}
+          />
+          {/* 경로 범례 */}
+          {(plannedPath.length > 0 || actualPath.length > 0) && (
+            <View style={styles.mapLegend}>
+              {plannedPath.length > 0 && (
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendLine, styles.legendPlanned]} />
+                  <Text style={styles.legendText}>계획 경로</Text>
+                </View>
+              )}
+              {actualPath.length > 0 && (
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendLine, styles.legendActual]} />
+                  <Text style={styles.legendText}>실제 경로</Text>
+                </View>
+              )}
+            </View>
+          )}
+          {/* 완주율 뱃지 */}
+          {routeCompletion > 0 && (
+            <View style={styles.completionBadge}>
+              <Text style={styles.completionText}>
+                완주율 {Math.round(routeCompletion)}%
               </Text>
-            </Animated.View>
-          );
-        })}
-      </View>
+            </View>
+          )}
+        </Animated.View>
 
-      {/* Achievement Badge */}
-      {parseFloat(distance) > 4.0 && (
+        {/* Distance Badge */}
         <Animated.View
-          entering={FadeInUp.delay(900).duration(400)}
-          style={styles.achievementCard}
+          entering={FadeInUp.delay(500).duration(400)}
+          style={styles.distanceBadgeContainer}
         >
-          <View style={styles.achievementIcon}>
-            <Trophy size={20} color={Colors.amber[400]} />
-          </View>
-          <View style={styles.achievementContent}>
-            <Text style={styles.achievementTitle}>개인 최고 기록 달성!</Text>
-            <Text style={styles.achievementSubtitle}>
-              이번 달 최장 거리입니다
-            </Text>
+          <View style={styles.distanceBadge}>
+            <Text style={styles.distanceText}>{distance} km</Text>
           </View>
         </Animated.View>
-      )}
 
-      {/* Custom Route Achievement */}
-      {isCustomDrawing && (
-        <Animated.View
-          entering={FadeInUp.delay(950).duration(400)}
-          style={styles.customAchievementCard}
-        >
-          <View style={styles.customAchievementIcon}>
-            <Sparkles size={20} color={Colors.purple[400]} />
-          </View>
-          <View style={styles.achievementContent}>
-            <Text style={styles.customAchievementTitle}>창의적인 경로!</Text>
-            <Text style={styles.achievementSubtitle}>
-              직접 그린 경로를 완주했습니다
-            </Text>
-          </View>
-        </Animated.View>
-      )}
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {stats.map((stat, index) => {
+            const Icon = stat.Icon;
+            return (
+              <Animated.View
+                key={stat.label}
+                entering={FadeInUp.delay(600 + index * 100).duration(400)}
+                style={styles.statCard}
+              >
+                <Icon size={24} color={stat.color} />
+                <Text style={styles.statLabel}>{stat.label}</Text>
+                <Text style={styles.statValue}>
+                  {stat.value}
+                  {stat.unit && (
+                    <Text style={styles.statUnit}> {stat.unit}</Text>
+                  )}
+                </Text>
+              </Animated.View>
+            );
+          })}
+        </View>
+
+        {/* Achievement Badge */}
+        {parseFloat(distance) > 4.0 && (
+          <Animated.View
+            entering={FadeInUp.delay(900).duration(400)}
+            style={styles.achievementCard}
+          >
+            <View style={styles.achievementIcon}>
+              <Trophy size={20} color={Colors.amber[400]} />
+            </View>
+            <View style={styles.achievementContent}>
+              <Text style={styles.achievementTitle}>개인 최고 기록 달성!</Text>
+              <Text style={styles.achievementSubtitle}>
+                이번 달 최장 거리입니다
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Custom Route Achievement */}
+        {isCustomDrawing && (
+          <Animated.View
+            entering={FadeInUp.delay(950).duration(400)}
+            style={styles.customAchievementCard}
+          >
+            <View style={styles.customAchievementIcon}>
+              <Sparkles size={20} color={Colors.purple[400]} />
+            </View>
+            <View style={styles.achievementContent}>
+              <Text style={styles.customAchievementTitle}>창의적인 경로!</Text>
+              <Text style={styles.achievementSubtitle}>
+                직접 그린 경로를 완주했습니다
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+      </ViewShot>
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
@@ -417,7 +517,11 @@ export default function ResultScreen() {
           entering={FadeInUp.delay(1000).duration(400)}
           style={styles.shareButtonRow}
         >
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            onPress={handleSharePress}
+          >
             <Share2 size={20} color={Colors.zinc[50]} />
             <Text style={styles.iconButtonText}>공유</Text>
           </TouchableOpacity>
@@ -497,6 +601,163 @@ export default function ResultScreen() {
                     disabled={!editRouteName.trim()}
                   >
                     <Text style={styles.modalConfirmText}>저장</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* 공유 선택 모달 */}
+      <Modal
+        visible={isShareModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsShareModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsShareModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <View style={styles.shareModalHeader}>
+                  <Text style={styles.modalTitle}>공유하기</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsShareModalVisible(false)}
+                    activeOpacity={0.7}
+                  >
+                    <X size={20} color={Colors.zinc[400]} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.modalSubtitle}>
+                  공유 방식을 선택해주세요
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.shareOptionButton}
+                  activeOpacity={0.7}
+                  onPress={handleSaveImage}
+                >
+                  <View style={styles.shareOptionIcon}>
+                    <Download size={22} color={Colors.blue[400]} />
+                  </View>
+                  <View style={styles.shareOptionContent}>
+                    <Text style={styles.shareOptionTitle}>이미지 저장</Text>
+                    <Text style={styles.shareOptionDesc}>
+                      운동 결과를 이미지로 갤러리에 저장합니다
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.shareOptionButton}
+                  activeOpacity={0.7}
+                  onPress={handlePostSelect}
+                >
+                  <View
+                    style={[
+                      styles.shareOptionIcon,
+                      styles.shareOptionIconPurple,
+                    ]}
+                  >
+                    <MessageSquare size={22} color={Colors.purple[400]} />
+                  </View>
+                  <View style={styles.shareOptionContent}>
+                    <Text style={styles.shareOptionTitle}>게시물 올리기</Text>
+                    <Text style={styles.shareOptionDesc}>
+                      커뮤니티에 운동 결과를 공유합니다
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* 게시물 작성 모달 */}
+      <Modal
+        visible={isPostModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPostModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsPostModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>게시물 올리기</Text>
+                <Text style={styles.modalSubtitle}>
+                  커뮤니티에 공유할 내용을 작성해주세요
+                </Text>
+
+                <Text style={styles.postLabel}>경로 이름</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={editRouteName}
+                  onChangeText={setEditRouteName}
+                  placeholder="경로 이름 입력"
+                  placeholderTextColor={Colors.zinc[500]}
+                  maxLength={100}
+                  autoFocus
+                  selectTextOnFocus
+                />
+
+                <Text style={styles.postLabel}>캡션 (선택)</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.captionInput]}
+                  value={postCaption}
+                  onChangeText={setPostCaption}
+                  placeholder="운동 소감을 남겨보세요"
+                  placeholderTextColor={Colors.zinc[500]}
+                  maxLength={500}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+
+                {/* 운동 요약 정보 */}
+                <View style={styles.postSummary}>
+                  <View style={styles.postSummaryItem}>
+                    <Text style={styles.postSummaryLabel}>거리</Text>
+                    <Text style={styles.postSummaryValue}>{distance} km</Text>
+                  </View>
+                  <View style={styles.postSummaryDivider} />
+                  <View style={styles.postSummaryItem}>
+                    <Text style={styles.postSummaryLabel}>시간</Text>
+                    <Text style={styles.postSummaryValue}>
+                      {formatTime(time)}
+                    </Text>
+                  </View>
+                  <View style={styles.postSummaryDivider} />
+                  <View style={styles.postSummaryItem}>
+                    <Text style={styles.postSummaryLabel}>페이스</Text>
+                    <Text style={styles.postSummaryValue}>{pace}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalCancelButton}
+                    onPress={() => setIsPostModalVisible(false)}
+                    activeOpacity={0.7}
+                    disabled={isPosting}
+                  >
+                    <Text style={styles.modalCancelText}>취소</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalConfirmButton,
+                      (!editRouteName.trim() || isPosting) &&
+                        styles.modalConfirmDisabled,
+                    ]}
+                    onPress={handleConfirmPost}
+                    activeOpacity={0.7}
+                    disabled={!editRouteName.trim() || isPosting}
+                  >
+                    <Text style={styles.modalConfirmText}>
+                      {isPosting ? "올리는 중..." : "올리기"}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -803,5 +1064,88 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     fontWeight: FontWeight.bold,
     color: "#fff",
+  },
+  viewShotContainer: {
+    width: "100%",
+    alignItems: "center",
+    backgroundColor: Colors.zinc[950],
+  },
+  shareModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  shareOptionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.zinc[800],
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.zinc[700],
+    marginBottom: Spacing.sm,
+  },
+  shareOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: `${Colors.blue[500]}20`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shareOptionIconPurple: {
+    backgroundColor: `${Colors.purple[500]}20`,
+  },
+  shareOptionContent: {
+    flex: 1,
+  },
+  shareOptionTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[50],
+    marginBottom: 2,
+  },
+  shareOptionDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.zinc[400],
+  },
+  postLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[300],
+    marginBottom: Spacing.xs,
+  },
+  captionInput: {
+    height: 80,
+    paddingTop: Spacing.md,
+  },
+  postSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    backgroundColor: Colors.zinc[800],
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  postSummaryItem: {
+    alignItems: "center",
+  },
+  postSummaryLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.zinc[500],
+    marginBottom: 2,
+  },
+  postSummaryValue: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+  },
+  postSummaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.zinc[700],
   },
 });
