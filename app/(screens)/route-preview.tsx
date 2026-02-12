@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Check,
   Clock,
+  Info,
   MapPin,
   Navigation,
   Shield,
@@ -13,6 +14,7 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -55,6 +57,7 @@ export default function RoutePreviewScreen() {
   const [sheetState, setSheetState] = useState<
     "collapsed" | "half" | "expanded"
   >("half");
+  const [safetyInfoVisible, setSafetyInfoVisible] = useState(false);
 
   const isCustomDrawing = params.mode === "custom";
   const fromSaved = params.fromSaved === "true";
@@ -307,6 +310,77 @@ export default function RoutePreviewScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {/* Safety Score Info Modal */}
+      <Modal
+        visible={safetyInfoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSafetyInfoVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSafetyInfoVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Shield size={24} color={Colors.purple[400]} />
+              <Text style={styles.modalTitle}>안전점수란?</Text>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              안전점수는 경로 주변의 CCTV와 가로등(보안등) 커버리지를 기반으로
+              계산됩니다.
+            </Text>
+
+            <View style={styles.modalInfoList}>
+              <View style={styles.modalInfoItem}>
+                <View
+                  style={[
+                    styles.modalDot,
+                    { backgroundColor: Colors.emerald[400] },
+                  ]}
+                />
+                <Text style={styles.modalInfoText}>
+                  경로를 20m 간격으로 나누어 각 지점을 분석합니다
+                </Text>
+              </View>
+              <View style={styles.modalInfoItem}>
+                <View
+                  style={[
+                    styles.modalDot,
+                    { backgroundColor: Colors.blue[400] },
+                  ]}
+                />
+                <Text style={styles.modalInfoText}>
+                  CCTV 50m 또는 가로등 15m 이내에 있으면 안전 구간으로
+                  판정합니다
+                </Text>
+              </View>
+              <View style={styles.modalInfoItem}>
+                <View
+                  style={[
+                    styles.modalDot,
+                    { backgroundColor: Colors.purple[400] },
+                  ]}
+                />
+                <Text style={styles.modalInfoText}>
+                  안전 구간 비율이 곧 안전점수(0~100점)가 됩니다
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setSafetyInfoVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCloseText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Bottom Sheet */}
       <BottomSheet onStateChange={setSheetState}>
         {/* 로딩 중이거나 선택된 경로가 아직 없으면 로딩 표시 */}
@@ -388,7 +462,15 @@ export default function RoutePreviewScreen() {
                   <Text style={styles.statLabel}>분</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Shield size={20} color={Colors.purple[400]} />
+                  <View style={styles.statCardHeader}>
+                    <Shield size={20} color={Colors.purple[400]} />
+                    <TouchableOpacity
+                      onPress={() => setSafetyInfoVisible(true)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Info size={14} color={Colors.zinc[500]} />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={styles.statValue}>{selectedRoute.safety}</Text>
                   <Text style={styles.statLabel}>점</Text>
                 </View>
@@ -826,5 +908,77 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: FontSize.base,
     color: Colors.zinc[400],
+  },
+  statCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    gap: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: Colors.zinc[900],
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    width: "100%",
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: Colors.zinc[800],
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
+    color: Colors.zinc[50],
+  },
+  modalDescription: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[300],
+    lineHeight: 22,
+    marginBottom: Spacing.md,
+  },
+  modalInfoList: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  modalInfoItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+  },
+  modalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  modalInfoText: {
+    fontSize: FontSize.sm,
+    color: Colors.zinc[400],
+    flex: 1,
+    lineHeight: 20,
+  },
+  modalCloseButton: {
+    backgroundColor: Colors.purple[500],
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+  },
+  modalCloseText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.zinc[50],
   },
 });
