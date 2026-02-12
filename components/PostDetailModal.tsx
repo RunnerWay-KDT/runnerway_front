@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import {
+  Bookmark,
   Clock,
   Flame,
   Heart,
@@ -30,6 +31,7 @@ import {
   FontWeight,
   Spacing,
 } from "../constants/theme";
+import { communityApi } from "../utils/api";
 import { getIconComponent } from "../utils/shapeIcons";
 import { KakaoMap } from "./KakaoMap";
 
@@ -73,6 +75,9 @@ interface Post {
   isLiked: boolean;
   isBookmarked: boolean;
   createdAt: string;
+  actualPath?: { lat: number; lng: number }[];
+  startLatitude?: number;
+  startLongitude?: number;
 }
 
 interface PostDetailModalProps {
@@ -83,98 +88,6 @@ interface PostDetailModalProps {
   onBookmark: (postId: string) => void;
 }
 
-// Mock 댓글 데이터
-const MOCK_COMMENTS: Comment[] = [
-  {
-    id: "comment_001",
-    author: {
-      id: "user_123",
-      name: "러너왕",
-    },
-    content: "와 정말 멋진 경로네요! 저도 따라 달려보고 싶어요 🏃‍♂️",
-    createdAt: "2026-01-22T10:30:00Z",
-    likes: 12,
-    isLiked: false,
-  },
-  {
-    id: "comment_002",
-    author: {
-      id: "user_456",
-      name: "달리기조아",
-    },
-    content: "여기 야경이 정말 이쁘던데 저녁에 가보세요!",
-    createdAt: "2026-01-22T09:15:00Z",
-    likes: 8,
-    isLiked: true,
-  },
-  {
-    id: "comment_003",
-    author: {
-      id: "user_789",
-      name: "마라톤러버",
-    },
-    content: "페이스가 좋으시네요~ 부럽습니다",
-    createdAt: "2026-01-22T08:45:00Z",
-    likes: 5,
-    isLiked: false,
-  },
-  {
-    id: "comment_004",
-    author: {
-      id: "user_234",
-      name: "건강달리기",
-    },
-    content: "저도 이 경로 자주 뛰는데 항상 좋아요 👍",
-    createdAt: "2026-01-22T07:20:00Z",
-    likes: 3,
-    isLiked: false,
-  },
-  {
-    id: "comment_005",
-    author: {
-      id: "user_567",
-      name: "조깅러버",
-    },
-    content: "초보자도 따라하기 괜찮을까요?",
-    createdAt: "2026-01-22T06:10:00Z",
-    likes: 2,
-    isLiked: false,
-  },
-  {
-    id: "comment_006",
-    author: {
-      id: "user_890",
-      name: "런데이",
-    },
-    content: "이 근처 카페 추천해요! 러닝 후 커피 한잔 ☕",
-    createdAt: "2026-01-21T22:45:00Z",
-    likes: 15,
-    isLiked: false,
-  },
-  {
-    id: "comment_007",
-    author: {
-      id: "user_345",
-      name: "산책좋아",
-    },
-    content: "경치가 정말 좋은 구간이네요. 주말에 가봐야겠어요!",
-    createdAt: "2026-01-21T20:30:00Z",
-    likes: 6,
-    isLiked: false,
-  },
-  {
-    id: "comment_008",
-    author: {
-      id: "user_678",
-      name: "러닝메이트",
-    },
-    content: "같이 뛸 분 계신가요? 평일 저녁 7시쯤 어때요?",
-    createdAt: "2026-01-21T18:15:00Z",
-    likes: 4,
-    isLiked: false,
-  },
-];
-
 export function PostDetailModal({
   visible,
   onClose,
@@ -182,17 +95,50 @@ export function PostDetailModal({
   onLike,
   onBookmark,
 }: PostDetailModalProps) {
-  const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [totalCommentCount, setTotalCommentCount] = useState(0);
 
-  // 모달이 열릴 때마다 댓글 초기화
+  // 모달이 열릴 때 게시글 상세 + 댓글 로드
   useEffect(() => {
-    if (visible) {
-      setComments(MOCK_COMMENTS);
+    if (visible && post) {
       setNewComment("");
+      setTotalCommentCount(post.comments);
+      loadComments();
     }
-  }, [visible]);
+  }, [visible, post?.id]);
+
+  const loadComments = async () => {
+    if (!post) return;
+    setLoadingComments(true);
+    try {
+      const response = await communityApi.getPostDetail(post.id);
+      if (response?.data?.comments) {
+        setComments(
+          response.data.comments.map((c: any) => ({
+            id: c.id,
+            author: {
+              id: c.author?.id || "",
+              name: c.author?.name || "알 수 없음",
+            },
+            content: c.content,
+            createdAt: c.created_at,
+            likes: c.like_count || 0,
+            isLiked: c.is_liked || false,
+          })),
+        );
+      }
+      if (response?.data?.post?.comment_count != null) {
+        setTotalCommentCount(response.data.post.comment_count);
+      }
+    } catch (error) {
+      console.error("댓글 로드 실패:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
 
   if (!post) return null;
 
@@ -224,46 +170,79 @@ export function PostDetailModal({
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim() || isSubmitting) return;
+    if (!newComment.trim() || isSubmitting || !post) return;
 
     setIsSubmitting(true);
 
-    // TODO: API 호출
-    // POST /api/v1/community/posts/{postId}/comments
+    try {
+      const response = await communityApi.createComment(
+        post.id,
+        newComment.trim(),
+      );
 
-    // Mock: 댓글 추가
-    const mockComment: Comment = {
-      id: `comment_${Date.now()}`,
-      author: {
-        id: "current_user",
-        name: "나",
-      },
-      content: newComment.trim(),
-      createdAt: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-    };
-
-    setComments((prev) => [mockComment, ...prev]);
-    setNewComment("");
-    setIsSubmitting(false);
+      if (response?.data) {
+        const newCommentData: Comment = {
+          id: response.data.comment_id || `comment_${Date.now()}`,
+          author: {
+            id: response.data.author?.id || "",
+            name: response.data.author?.name || "나",
+          },
+          content: response.data.content || newComment.trim(),
+          createdAt: response.data.created_at || new Date().toISOString(),
+          likes: 0,
+          isLiked: false,
+        };
+        setComments((prev) => [newCommentData, ...prev]);
+        setTotalCommentCount((prev) => prev + 1);
+      }
+      setNewComment("");
+    } catch (error) {
+      console.error("댓글 작성 실패:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCommentLike = (commentId: string) => {
+  const handleCommentLike = async (commentId: string) => {
+    const comment = comments.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    const wasLiked = comment.isLiked;
+
+    // Optimistic update
     setComments((prev) =>
-      prev.map((comment) =>
-        comment.id === commentId
+      prev.map((c) =>
+        c.id === commentId
           ? {
-              ...comment,
-              isLiked: !comment.isLiked,
-              likes: comment.isLiked ? comment.likes - 1 : comment.likes + 1,
+              ...c,
+              isLiked: !c.isLiked,
+              likes: c.isLiked ? c.likes - 1 : c.likes + 1,
             }
-          : comment,
+          : c,
       ),
     );
 
-    // TODO: API 호출
-    // POST /api/v1/community/comments/{commentId}/like
+    try {
+      if (wasLiked) {
+        await communityApi.unlikeComment(commentId);
+      } else {
+        await communityApi.likeComment(commentId);
+      }
+    } catch (error) {
+      // Rollback on failure
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                isLiked: wasLiked,
+                likes: wasLiked ? c.likes + 1 : c.likes - 1,
+              }
+            : c,
+        ),
+      );
+      console.error("댓글 좋아요 실패:", error);
+    }
   };
 
   return (
@@ -318,7 +297,20 @@ export function PostDetailModal({
               {/* 지도 영역 */}
               <View style={styles.mapSection}>
                 <View style={styles.mapContainer}>
-                  <KakaoMap routePath={post.route.shapeId} />
+                  <KakaoMap
+                    routePath={""}
+                    actualPath={post.actualPath}
+                    center={
+                      post.startLatitude && post.startLongitude
+                        ? { lat: post.startLatitude, lng: post.startLongitude }
+                        : post.actualPath && post.actualPath.length > 0
+                          ? {
+                              lat: post.actualPath[0].lat,
+                              lng: post.actualPath[0].lng,
+                            }
+                          : undefined
+                    }
+                  />
                 </View>
                 <LinearGradient
                   colors={["transparent", Colors.zinc[950]]}
@@ -343,10 +335,12 @@ export function PostDetailModal({
                   </View>
                   <View style={styles.routeText}>
                     <Text style={styles.routeName}>{post.route.name}</Text>
-                    <View style={styles.locationRow}>
-                      <MapPin size={12} color={Colors.zinc[500]} />
-                      <Text style={styles.locationText}>{post.location}</Text>
-                    </View>
+                    {post.location ? (
+                      <View style={styles.locationRow}>
+                        <MapPin size={12} color={Colors.zinc[500]} />
+                        <Text style={styles.locationText}>{post.location}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
@@ -361,12 +355,16 @@ export function PostDetailModal({
                   </View>
                   <View style={styles.statItem}>
                     <Clock size={16} color={Colors.blue[400]} />
-                    <Text style={styles.statValue}>{post.route.duration}</Text>
+                    <Text style={styles.statValue}>
+                      {Math.floor(post.route.duration / 60)}
+                    </Text>
                     <Text style={styles.statLabel}>분</Text>
                   </View>
                   <View style={styles.statItem}>
                     <TrendingUp size={16} color={Colors.purple[400]} />
-                    <Text style={styles.statValue}>{post.route.pace}</Text>
+                    <Text style={styles.statValue}>
+                      {post.route.pace || "-"}
+                    </Text>
                     <Text style={styles.statLabel}>/km</Text>
                   </View>
                   <View style={styles.statItem}>
@@ -408,8 +406,30 @@ export function PostDetailModal({
 
                 <View style={styles.actionButton}>
                   <MessageCircle size={24} color={Colors.zinc[400]} />
-                  <Text style={styles.actionCount}>{comments.length}</Text>
+                  <Text style={styles.actionCount}>{totalCommentCount}</Text>
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { marginLeft: "auto" }]}
+                  onPress={() => onBookmark(post.id)}
+                  activeOpacity={0.7}
+                >
+                  <Bookmark
+                    size={24}
+                    color={
+                      post.isBookmarked ? Colors.amber[500] : Colors.zinc[400]
+                    }
+                    fill={post.isBookmarked ? Colors.amber[500] : "transparent"}
+                  />
+                  <Text
+                    style={[
+                      styles.actionCount,
+                      post.isBookmarked && { color: Colors.amber[500] },
+                    ]}
+                  >
+                    {post.bookmarks}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* 댓글 섹션 */}
@@ -417,7 +437,7 @@ export function PostDetailModal({
                 <View style={styles.commentsSectionHeader}>
                   <MessageCircle size={18} color={Colors.zinc[400]} />
                   <Text style={styles.commentsTitle}>
-                    댓글 {comments.length}
+                    댓글 {totalCommentCount}
                   </Text>
                 </View>
 
@@ -442,35 +462,31 @@ export function PostDetailModal({
                         <Text style={styles.commentText}>
                           {comment.content}
                         </Text>
-                        {comment.likes > 0 && (
-                          <TouchableOpacity
-                            style={styles.commentLike}
-                            onPress={() => handleCommentLike(comment.id)}
-                            activeOpacity={0.7}
+                        <TouchableOpacity
+                          style={styles.commentLike}
+                          onPress={() => handleCommentLike(comment.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Heart
+                            size={12}
+                            color={
+                              comment.isLiked
+                                ? Colors.red[500]
+                                : Colors.zinc[600]
+                            }
+                            fill={
+                              comment.isLiked ? Colors.red[500] : "transparent"
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.commentLikeCount,
+                              comment.isLiked && { color: Colors.red[500] },
+                            ]}
                           >
-                            <Heart
-                              size={12}
-                              color={
-                                comment.isLiked
-                                  ? Colors.red[500]
-                                  : Colors.zinc[600]
-                              }
-                              fill={
-                                comment.isLiked
-                                  ? Colors.red[500]
-                                  : "transparent"
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.commentLikeCount,
-                                comment.isLiked && { color: Colors.red[500] },
-                              ]}
-                            >
-                              {comment.likes}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
+                            {comment.likes}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>

@@ -126,7 +126,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.savedRouteButton}
             activeOpacity={0.9}
-            onPress={() => router.push("/(screens)/route-select")}
+            onPress={() => router.push("/(screens)/saved-routes")}
           >
             <View style={styles.savedRouteButtonContent}>
               <Heart

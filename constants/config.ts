@@ -61,6 +61,15 @@ export const API_CONFIG = {
       SAVE: "/api/v1/routes", // /{route_id}/save  POST
       UNSAVE: "/api/v1/routes", // /{route_id}/save  DELETE
     },
+    COMMUNITY: {
+      FEED: "/api/v1/community/feed",
+      POSTS: "/api/v1/community/posts", // POST: 게시물 작성, GET /{post_id}: 상세
+      POST_LIKE: "/api/v1/community/posts", // /{post_id}/like
+      POST_BOOKMARK: "/api/v1/community/posts", // /{post_id}/bookmark
+      COMMENTS: "/api/v1/community/posts", // /{post_id}/comments
+      COMMENT_DELETE: "/api/v1/community/comments", // /{comment_id}
+      COMMENT_LIKE: "/api/v1/community/comments", // /{comment_id}/like
+    },
   },
 };
 
