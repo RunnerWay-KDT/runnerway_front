@@ -192,6 +192,8 @@ export interface WorkoutSummary {
   route_completion: number | null;
   is_bookmarked: boolean;
   svg_path: string | null; // 커스텀 경로의 SVG path 데이터
+  shape_id: string | null; // 프리셋 도형 식별자 (예: 'heart', 'star')
+  icon_name: string | null; // 프리셋 도형 아이콘 이름
   started_at: string;
   completed_at: string | null;
 }

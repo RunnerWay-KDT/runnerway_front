@@ -65,16 +65,36 @@ interface WorkoutRecord {
 /** 백엔드 WorkoutSummary → 프론트 WorkoutRecord 변환 */
 function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
   let routeData = { shapeId: "custom", shapeName: "커스텀", iconName: "heart" };
-  
-  // SHAPE_LIST 기반으로 매칭
-  for (const shape of SHAPE_LIST) {
-    if (w.route_name.includes(shape.name)) {
+
+  // 1) 서버에서 프리셋 도형 정보가 내려온 경우 우선 사용
+  if (w.icon_name) {
+    const matched = SHAPE_LIST.find((s) => s.iconName === w.icon_name);
+    routeData = {
+      shapeId: matched?.id ?? w.icon_name,
+      shapeName: matched?.name ?? w.icon_name,
+      iconName: w.icon_name,
+    };
+  } else if (w.shape_id) {
+    // shape_id로 매칭 (icon_name이 없을 때 펴백)
+    const matched = SHAPE_LIST.find((s) => s.id === w.shape_id);
+    if (matched) {
       routeData = {
-        shapeId: shape.id,
-        shapeName: shape.name,
-        iconName: shape.iconName,
+        shapeId: matched.id,
+        shapeName: matched.name,
+        iconName: matched.iconName,
       };
-      break;
+    }
+  } else {
+    // 2) 서버 정보가 없으면 route_name에서 한국어 이름 매칭 (펴백)
+    for (const shape of SHAPE_LIST) {
+      if (w.route_name.includes(shape.name)) {
+        routeData = {
+          shapeId: shape.id,
+          shapeName: shape.name,
+          iconName: shape.iconName,
+        };
+        break;
+      }
     }
   }
 
