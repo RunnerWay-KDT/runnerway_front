@@ -37,7 +37,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { getIconComponent } from "../../utils/shapeIcons";
+import { getPresetSvgPath, SHAPE_LIST } from "../../constants/presetShapes";
 import { workoutApi, savedRouteApi, routeApi } from "../../utils/api";
 import type { WorkoutSummary } from "../../types/api";
 
@@ -64,23 +64,16 @@ interface WorkoutRecord {
 
 /** 백엔드 WorkoutSummary → 프론트 WorkoutRecord 변환 */
 function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
-  // route_name 에서 shape 추론 (예: "하트 경로 B" → heart)
-  const shapeMap: Record<
-    string,
-    { shapeId: string; shapeName: string; iconName: string }
-  > = {
-    하트: { shapeId: "heart", shapeName: "하트", iconName: "heart" },
-    별: { shapeId: "star", shapeName: "별", iconName: "star" },
-    커피: { shapeId: "coffee", shapeName: "커피", iconName: "coffee" },
-    강아지: { shapeId: "dog", shapeName: "강아지", iconName: "dog" },
-    고양이: { shapeId: "cat", shapeName: "고양이", iconName: "cat" },
-    스마일: { shapeId: "smile", shapeName: "스마일", iconName: "smile" },
-  };
-
   let routeData = { shapeId: "custom", shapeName: "커스텀", iconName: "heart" };
-  for (const [keyword, data] of Object.entries(shapeMap)) {
-    if (w.route_name.includes(keyword)) {
-      routeData = data;
+  
+  // SHAPE_LIST 기반으로 매칭
+  for (const shape of SHAPE_LIST) {
+    if (w.route_name.includes(shape.name)) {
+      routeData = {
+        shapeId: shape.id,
+        shapeName: shape.name,
+        iconName: shape.iconName,
+      };
       break;
     }
   }
@@ -396,7 +389,7 @@ export default function WorkoutHistoryScreen() {
     item: WorkoutRecord;
     index: number;
   }) => {
-    const RouteIcon = getIconComponent(item.routeData.iconName);
+    const iconSvgPath = getPresetSvgPath(item.routeData.iconName);
     const isRunning = item.type === "running";
 
     return (
@@ -443,10 +436,10 @@ export default function WorkoutHistoryScreen() {
                   color={Colors.purple[400]}
                 />
               ) : (
-                <RouteIcon
+                <SvgPathIcon
+                  svgPath={iconSvgPath}
                   size={32}
                   color={isRunning ? Colors.emerald[400] : Colors.blue[400]}
-                  strokeWidth={1.5}
                 />
               )}
             </View>

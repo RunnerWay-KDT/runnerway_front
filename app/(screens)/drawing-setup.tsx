@@ -42,6 +42,7 @@ export default function DrawingSetupScreen() {
           targetDistanceKm: estimatedDistance,
           startLat: params.startLat as string | undefined,
           startLng: params.startLng as string | undefined,
+          svgPath: params.svgPath as string | undefined,
         },
       });
     }

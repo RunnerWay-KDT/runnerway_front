@@ -151,7 +151,10 @@ export default function GeneratingScreen() {
             const shapeId = params.shapeId as string;
             body.shape_id = params.shapeId as string;
             body.start = { lat: startLat, lng: startLng };
-            if (PRESET_SVG_PATHS[shapeId]) {
+            if (params.svgPath) {
+              // Decode URI component (Expo Router encodes params)
+              body.svg_path = decodeURIComponent(params.svgPath as string);
+            } else if (PRESET_SVG_PATHS[shapeId]) {
               body.svg_path = PRESET_SVG_PATHS[shapeId];
             }
           } else {

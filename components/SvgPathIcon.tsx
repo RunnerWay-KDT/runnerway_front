@@ -64,8 +64,8 @@ export const SvgPathIcon: React.FC<SvgPathIconProps> = ({
     // padding: viewBox 크기의 10%
     const padding = maxDim * 0.1;
 
-    // strokeWidth: viewBox 대비 약 7% (선이 잘 보이도록)
-    const autoStroke = maxDim * 0.07;
+    // strokeWidth: viewBox 대비 약 7% -> 8.3% (Lucide 2px/24px 비율과 유사하게 조정)
+    const autoStroke = maxDim * 0.083;
 
     return {
       viewBox: `${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`,
