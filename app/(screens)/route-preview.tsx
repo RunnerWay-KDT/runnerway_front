@@ -32,7 +32,6 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { SvgPathIcon } from "../../components/SvgPathIcon";
 import { getPresetSvgPath } from "../../constants/presetShapes";
 import { routeApi } from "@/utils/api";
 
@@ -525,7 +524,11 @@ export default function RoutePreviewScreen() {
                   ) : isCustomDrawing ? (
                     <Sparkles size={24} color={Colors.purple[400]} />
                   ) : (
-                    <SvgPathIcon svgPath={iconSvgPath} size={24} color={Colors.emerald[400]} />
+                    <SvgPathIcon
+                      svgPath={iconSvgPath}
+                      size={24}
+                      color={Colors.emerald[400]}
+                    />
                   )}
                 </View>
                 <View style={styles.routeInfo}>
