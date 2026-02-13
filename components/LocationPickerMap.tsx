@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { KAKAO_MAP_CONFIG } from "../constants/config";
@@ -11,6 +11,8 @@ interface LocationPickerMapProps {
   polyline?: { lat: number; lng: number }[];
 }
 
+const DEFAULT_LOCATION = { lat: 37.5007, lng: 127.0364 };
+
 export default function LocationPickerMap({
   onLocationSelected,
   initialLocation,
@@ -20,53 +22,89 @@ export default function LocationPickerMap({
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentLocation, setCurrentLocation] = useState(
-    initialLocation || { lat: 37.5007, lng: 127.0364 },
+    initialLocation || DEFAULT_LOCATION,
   );
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [isGettingLocation, setIsGettingLocation] = useState(true);
+  // 지도를 바로 보여주기 위해 GPS 대기 상태를 false로 시작
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const onLocationSelectedRef = useRef(onLocationSelected);
+  onLocationSelectedRef.current = onLocationSelected;
+
+  // GPS 완료 후 WebView에 지도 중심 이동 메시지 전송
+  const movMapCenter = useCallback((lat: number, lng: number) => {
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+          if (typeof map !== 'undefined' && map) {
+            map.setCenter(new kakao.maps.LatLng(${lat}, ${lng}));
+          }
+          true;
+        `);
+    }
+  }, []);
 
   useEffect(() => {
+    if (initialLocation) {
+      if (onLocationSelectedRef.current) {
+        onLocationSelectedRef.current(initialLocation);
+      }
+      return;
+    }
+
+    let isMounted = true;
+
     const getCurrentLocation = async () => {
       try {
-        setIsGettingLocation(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status !== "granted") {
-          setLocationError("위치 권한이 필요합니다");
-          setIsGettingLocation(false);
+          if (isMounted) setLocationError("위치 권한이 필요합니다");
           return;
         }
 
+        // 1단계: 캐시된 마지막 위치를 즉시 가져와 지도에 표시 (0초 소요)
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (lastKnown && isMounted) {
+          const quickLocation = {
+            lat: lastKnown.coords.latitude,
+            lng: lastKnown.coords.longitude,
+          };
+          setCurrentLocation(quickLocation);
+          movMapCenter(quickLocation.lat, quickLocation.lng);
+          if (onLocationSelectedRef.current) {
+            onLocationSelectedRef.current(quickLocation);
+          }
+        }
+
+        // 2단계: 정확한 위치를 Balanced 정확도로 획득 (기존 High 대비 훨씬 빠름)
         const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
+          accuracy: Location.Accuracy.Balanced,
         });
 
-        const newLocation = {
-          lat: location.coords.latitude,
-          lng: location.coords.longitude,
-        };
-
-        setCurrentLocation(newLocation);
-        setIsGettingLocation(false);
-
-        if (onLocationSelected) {
-          onLocationSelected(newLocation);
+        if (isMounted) {
+          const newLocation = {
+            lat: location.coords.latitude,
+            lng: location.coords.longitude,
+          };
+          setCurrentLocation(newLocation);
+          movMapCenter(newLocation.lat, newLocation.lng);
+          if (onLocationSelectedRef.current) {
+            onLocationSelectedRef.current(newLocation);
+          }
         }
       } catch (error) {
         console.error("위치 가져오기 에러:", error);
-        setLocationError("위치를 가져올 수 없습니다");
-        setIsGettingLocation(false);
+        if (isMounted) {
+          // 에러가 발생해도 기본 좌표로 지도는 계속 표시
+          setLocationError(null);
+        }
       }
     };
 
-    if (!initialLocation) {
-      getCurrentLocation();
-    } else {
-      setIsGettingLocation(false);
-      if (onLocationSelected) {
-        onLocationSelected(initialLocation);
-      }
-    }
+    getCurrentLocation();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleMessage = (event: WebViewMessageEvent) => {
@@ -75,12 +113,13 @@ export default function LocationPickerMap({
 
       if (data.type === "mapLoaded") {
         setIsLoading(false);
+        setMapReady(true);
       } else if (
         data.type === "locationChanged" ||
         data.type === "locationSelected"
       ) {
-        if (onLocationSelected) {
-          onLocationSelected({ lat: data.lat, lng: data.lng });
+        if (onLocationSelectedRef.current) {
+          onLocationSelectedRef.current({ lat: data.lat, lng: data.lng });
         }
       } else if (data.type === "error") {
         console.error("Map error:", data.message);
@@ -90,17 +129,10 @@ export default function LocationPickerMap({
     }
   };
 
-  const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_CONFIG.APP_KEY}"></script><style>*{margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden}#map{width:100%;height:100%}</style></head><body><div id="map"></div><script>let map;let debounceTimer;function initMap(){try{const container=document.getElementById('map');const options={center:new kakao.maps.LatLng(${currentLocation.lat},${currentLocation.lng}),level:3};map=new kakao.maps.Map(container,options);window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapLoaded'}));kakao.maps.event.addListener(map,'idle',function(){const center=map.getCenter();clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){window.ReactNativeWebView.postMessage(JSON.stringify({type:'locationChanged',lat:center.getLat(),lng:center.getLng()}));},300);});}catch(error){window.ReactNativeWebView.postMessage(JSON.stringify({type:'error',message:error.toString()}));}}if(typeof kakao!=='undefined'&&kakao.maps){initMap();}else{document.addEventListener('DOMContentLoaded',function(){setTimeout(initMap,100);});}</script></body></html>`;
-
-  if (isGettingLocation) {
-    return (
-      <View style={[styles.container, style]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>현재 위치를 가져오는 중...</Text>
-        </View>
-      </View>
-    );
+  // 흔들릴 수 있어서 useMemo 대신 ref로 한 번만 생성
+  const htmlContentRef = useRef<string | null>(null);
+  if (!htmlContentRef.current) {
+    htmlContentRef.current = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_CONFIG.APP_KEY}"></script><style>*{margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden}#map{width:100%;height:100%}</style></head><body><div id="map"></div><script>let map;let debounceTimer;function initMap(){try{const container=document.getElementById('map');const options={center:new kakao.maps.LatLng(${currentLocation.lat},${currentLocation.lng}),level:3};map=new kakao.maps.Map(container,options);window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapLoaded'}));kakao.maps.event.addListener(map,'idle',function(){const center=map.getCenter();clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){window.ReactNativeWebView.postMessage(JSON.stringify({type:'locationChanged',lat:center.getLat(),lng:center.getLng()}));},300);});}catch(error){window.ReactNativeWebView.postMessage(JSON.stringify({type:'error',message:error.toString()}));}}if(typeof kakao!=='undefined'&&kakao.maps){initMap();}else{document.addEventListener('DOMContentLoaded',function(){setTimeout(initMap,100);});}</script></body></html>`;
   }
 
   if (locationError) {
@@ -117,7 +149,7 @@ export default function LocationPickerMap({
     <View style={[styles.container, style]}>
       <WebView
         ref={webViewRef}
-        source={{ html: htmlContent }}
+        source={{ html: htmlContentRef.current! }}
         style={styles.webview}
         onMessage={handleMessage}
         javaScriptEnabled={true}
