@@ -31,7 +31,8 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { getIconComponent } from "../../utils/shapeIcons";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
+import { getPresetSvgPath } from "../../constants/presetShapes";
 import { routeApi } from "@/utils/api";
 
 interface RouteOption {
@@ -69,7 +70,10 @@ export default function RoutePreviewScreen() {
 
   const generateRouteOptions = (): RouteOption[] => {
     const baseDistance = parseFloat(
-      (params.shapeDistance as string) || (params.distance as string) || "4.2",
+      (params.targetDistanceKm as string) ||
+        (params.shapeDistance as string) ||
+        (params.distance as string) ||
+        "4.2",
     );
 
     return [
@@ -266,7 +270,7 @@ export default function RoutePreviewScreen() {
     };
   }, [routeId]);
 
-  const RouteIcon = getIconComponent(iconName);
+  const iconSvgPath = getPresetSvgPath(iconName);
 
   // workout으로 선택한 경로 좌표 넘기기 (실제 경로 좌표가 있으면 그것을 넘기고, 없으면 프리셋 경로 좌표를 넘김)
   const handleStart = () => {
@@ -493,7 +497,7 @@ export default function RoutePreviewScreen() {
                   {isCustomDrawing ? (
                     <Sparkles size={24} color={Colors.purple[400]} />
                   ) : (
-                    <RouteIcon size={24} color={Colors.emerald[400]} />
+                    <SvgPathIcon svgPath={iconSvgPath} size={24} color={Colors.emerald[400]} />
                   )}
                 </View>
                 <View style={styles.routeInfo}>

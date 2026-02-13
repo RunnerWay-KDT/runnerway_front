@@ -30,7 +30,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { getIconComponent } from "../../utils/shapeIcons";
+import { getPresetSvgPath } from "../../constants/presetShapes";
 import { savedRouteApi } from "../../utils/api";
 import type { SavedRouteSummary } from "../../types/api";
 
@@ -265,7 +265,7 @@ export default function SavedRoutesScreen() {
     item: SavedRouteItem;
     index: number;
   }) => {
-    const RouteIcon = getIconComponent(item.routeData.iconName);
+    const iconSvgPath = getPresetSvgPath(item.routeData.iconName);
     const safetyColor = getSafetyColor(item.safetyScore);
 
     return (
@@ -308,10 +308,10 @@ export default function SavedRoutesScreen() {
                   color={Colors.purple[400]}
                 />
               ) : (
-                <RouteIcon
+                <SvgPathIcon
+                  svgPath={iconSvgPath}
                   size={32}
                   color={Colors.emerald[400]}
-                  strokeWidth={1.5}
                 />
               )}
             </View>

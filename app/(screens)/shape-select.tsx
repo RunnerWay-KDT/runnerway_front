@@ -8,18 +8,11 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
+import { getPresetSvgPath, SHAPE_LIST } from "../../constants/presetShapes";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Heart,
-  Star,
-  Coffee,
-  Smile,
-  Dog,
-  Cat,
-  Pencil,
-  Shapes,
-  Check,
-} from "lucide-react-native";
+import { Pencil, Shapes, Check } from "lucide-react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -37,10 +30,9 @@ import { routeApi } from "../../utils/api";
 interface Shape {
   id: string;
   name: string;
-  Icon: React.ElementType;
   iconName: string;
-  distance: string;
   colors: [string, string];
+  svgPath: string;
 }
 
 export default function ShapeSelectScreen() {
@@ -53,61 +45,24 @@ export default function ShapeSelectScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedPathData, setSavedPathData] = useState<string>("");
 
-  const shapes: Shape[] = [
-    {
-      id: "heart",
-      name: "하트",
-      Icon: Heart,
-      iconName: "heart",
-      distance: "4.2km",
-      colors: [Colors.pink[500], Colors.red[500]],
-    },
-    {
-      id: "star",
-      name: "별",
-      Icon: Star,
-      iconName: "star",
-      distance: "5.8km",
-      colors: [Colors.amber[500], Colors.amber[600]],
-    },
-    {
-      id: "coffee",
-      name: "커피",
-      Icon: Coffee,
-      iconName: "coffee",
-      distance: "3.5km",
-      colors: [Colors.amber[600], Colors.orange[600]],
-    },
-    {
-      id: "smile",
-      name: "스마일",
-      Icon: Smile,
-      iconName: "smile",
-      distance: "4.0km",
-      colors: [Colors.amber[400], Colors.orange[400]],
-    },
-  ];
+  // Helper to get colors (can be static or dynamic)
+  const getShapeColors = (category: string, index: number): [string, string] => {
+      // Logic for colors based on category
+      if (category === 'animal') {
+          return [Colors.blue[500], Colors.blue[600]];
+      }
+      // Alternate colors for shapes
+      if (index % 2 === 0) return [Colors.pink[500], Colors.red[500]];
+      return [Colors.amber[500], Colors.orange[500]];
+  };
 
-  const animals: Shape[] = [
-    {
-      id: "dog",
-      name: "강아지",
-      Icon: Dog,
-      iconName: "dog",
-      distance: "6.2km",
-      colors: [Colors.blue[500], Colors.blue[600]],
-    },
-    {
-      id: "cat",
-      name: "고양이",
-      Icon: Cat,
-      iconName: "cat",
-      distance: "5.5km",
-      colors: [Colors.purple[500], Colors.pink[500]],
-    },
-  ];
+  const allShapes = SHAPE_LIST.map((item, index) => ({
+    ...item,
+    colors: getShapeColors(item.category ?? 'shape', index),
+  }));
 
-  const allShapes = [...shapes, ...animals];
+  const shapes = allShapes.filter((s) => s.category === "shape");
+  const animals = allShapes.filter((s) => s.category === "animal");
 
   const handlePresetSelect = (shapeId: string) => {
     setSelectedShape(shapeId);
@@ -181,10 +136,31 @@ export default function ShapeSelectScreen() {
     setHasCustomDrawing(hasDrawing);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (activeMainTab === "presets" && selectedShape) {
       const selected = allShapes.find((s) => s.id === selectedShape);
       if (selected) {
+        let startLat = params.startLat;
+        let startLng = params.startLng;
+
+        // If location is missing from params, try to get current location
+        if (!startLat || !startLng) {
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") {
+              Alert.alert("알림", "위치 권한이 필요합니다.");
+              return;
+            }
+            const location = await Location.getCurrentPositionAsync({});
+            startLat = location.coords.latitude.toString();
+            startLng = location.coords.longitude.toString();
+          } catch (error) {
+            console.error("Location error:", error);
+            Alert.alert("알림", "현재 위치를 가져올 수 없습니다.");
+            return;
+          }
+        }
+
         router.push({
           pathname: "/(screens)/drawing-setup",
           params: {
@@ -192,9 +168,9 @@ export default function ShapeSelectScreen() {
             shapeId: selected.id,
             shapeName: selected.name,
             shapeIconName: selected.iconName,
-            shapeDistance: selected.distance,
-            startLat: params.startLat,
-            startLng: params.startLng,
+            startLat: startLat,
+            startLng: startLng,
+            svgPath: selected.svgPath || getPresetSvgPath(selected.iconName), // Pass Frontend SVG
           },
         });
       }
@@ -205,7 +181,6 @@ export default function ShapeSelectScreen() {
     activeMainTab === "presets" ? !!selectedShape : hasCustomDrawing;
 
   const ShapeCard = ({ shape }: { shape: Shape }) => {
-    const Icon = shape.Icon;
     const isSelected = selectedShape === shape.id;
 
     return (
@@ -221,9 +196,8 @@ export default function ShapeSelectScreen() {
           end={{ x: 1, y: 1 }}
         />
         <View style={styles.shapeContent}>
-          <Icon size={48} color="#fff" strokeWidth={1.5} />
+          <SvgPathIcon svgPath={shape.svgPath} size={48} color="#fff" />
           <Text style={styles.shapeName}>{shape.name}</Text>
-          <Text style={styles.shapeDistance}>예상 {shape.distance}</Text>
         </View>
         {isSelected && (
           <Animated.View
@@ -483,11 +457,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
     marginTop: Spacing.sm,
-  },
-  shapeDistance: {
-    fontSize: FontSize.sm,
-    color: Colors.zinc[400],
-    marginTop: Spacing.xs,
   },
   checkBadge: {
     position: "absolute",
