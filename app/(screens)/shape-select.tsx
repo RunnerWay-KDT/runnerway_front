@@ -37,9 +37,15 @@ interface Shape {
 
 export default function ShapeSelectScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ startLat?: string; startLng?: string }>();
+  const params = useLocalSearchParams<{
+    startLat?: string;
+    startLng?: string;
+    initialTab?: string;
+  }>();
   const [selectedShape, setSelectedShape] = useState("");
-  const [activeMainTab, setActiveMainTab] = useState("presets");
+  const [activeMainTab, setActiveMainTab] = useState(
+    params.initialTab === "draw" ? "draw" : "presets",
+  );
   const [activeSubTab, setActiveSubTab] = useState("shapes");
   const [hasCustomDrawing, setHasCustomDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

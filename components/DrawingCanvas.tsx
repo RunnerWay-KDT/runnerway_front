@@ -294,10 +294,6 @@ export function DrawingCanvas({
             <Text style={styles.infoLabel}>예상 거리</Text>
             <Text style={styles.infoValue}>{calculateDistance()} km</Text>
           </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>획 수</Text>
-            <Text style={styles.infoValue}>{paths.length}</Text>
-          </View>
         </View>
       )}
 
@@ -323,30 +319,6 @@ export function DrawingCanvas({
             ]}
           >
             되돌리기
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleClear}
-          style={[
-            styles.controlButton,
-            !hasDrawing && styles.controlButtonDisabled,
-          ]}
-          disabled={!hasDrawing}
-          activeOpacity={0.7}
-        >
-          <Trash2
-            size={20}
-            color={hasDrawing ? Colors.red[400] : Colors.zinc[600]}
-          />
-          <Text
-            style={[
-              styles.controlText,
-              styles.controlTextDanger,
-              !hasDrawing && styles.controlTextDisabled,
-            ]}
-          >
-            전체 지우기
           </Text>
         </TouchableOpacity>
 
@@ -377,9 +349,7 @@ export function DrawingCanvas({
       </View>
 
       {/* Hint */}
-      <Text style={styles.hint}>
-        💡 여러 번 그려서 복잡한 경로도 만들 수 있어요
-      </Text>
+      <Text style={styles.hint}>💡 시작과 끝이 일치하지 않아도 돼요!</Text>
     </View>
   );
 }

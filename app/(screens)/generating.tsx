@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Alert,
+  TouchableOpacity,
+} from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Loader2, Sparkles, Shield, Route } from "lucide-react-native";
 import { routeApi } from "../../utils/api";
@@ -22,10 +29,26 @@ export default function GeneratingScreen() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [estimatedRemainingSec, setEstimatedRemainingSec] = useState<number | null>(null);
+  const [estimatedRemainingSec, setEstimatedRemainingSec] = useState<
+    number | null
+  >(null);
   const startedRef = useRef(false);
   const cancelledRef = useRef(false);
   const rotation = useSharedValue(0);
+
+  // 컴포넌트 마운트/언마운트 시 ref 리셋
+  useEffect(() => {
+    startedRef.current = false;
+    cancelledRef.current = false;
+    setProgress(0);
+    setCurrentStep(0);
+    setError(null);
+    setEstimatedRemainingSec(null);
+    return () => {
+      cancelledRef.current = true;
+      startedRef.current = false;
+    };
+  }, []);
 
   // 로더 회전: 마운트 시 한 번만 시작, 완료될 때까지 계속
   useEffect(() => {
@@ -46,7 +69,7 @@ export default function GeneratingScreen() {
     if (mode === "running") {
       if (startedRef.current) return;
       startedRef.current = true;
-      
+
       const run = async () => {
         const timer = setInterval(() => {
           setProgress((prev) => (prev < 90 ? prev + 1 : prev));
@@ -92,7 +115,7 @@ export default function GeneratingScreen() {
           if (!cancelledRef.current) {
             Alert.alert(
               "오류",
-              "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+              "경로 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
             );
             router.back();
           }
@@ -101,7 +124,7 @@ export default function GeneratingScreen() {
       run();
       return () => {
         cancelledRef.current = true;
-      }
+      };
     }
 
     // 그림 경로: custom / shape -> 비동기 생성(시작 후 폴링, 타임아웃 방지)
@@ -112,8 +135,7 @@ export default function GeneratingScreen() {
       const run = async () => {
         try {
           const targetKm = parseFloat(
-            (params.targetDistanceKm as string) ||
-            "5"
+            (params.targetDistanceKm as string) || "5",
           );
           const startLat = parseFloat((params.startLat as string) || "37.5");
           const startLng = parseFloat((params.startLng as string) || "127");
@@ -152,7 +174,11 @@ export default function GeneratingScreen() {
           const poll = async (): Promise<void> => {
             if (cancelledRef.current) return;
             const statusRes = await routeApi.getRouteGenerationStatus(taskId);
-            console.log('progress:', statusRes.progress, typeof statusRes.progress);
+            console.log(
+              "progress:",
+              statusRes.progress,
+              typeof statusRes.progress,
+            );
             if (cancelledRef.current) return;
 
             // API progress / estimated_remaining / current_step 반영
@@ -160,10 +186,12 @@ export default function GeneratingScreen() {
               setProgress(statusRes.progress);
             }
             if (typeof statusRes.estimated_remaining === "number") {
-              setEstimatedRemainingSec(statusRes.estimated_remaining)
+              setEstimatedRemainingSec(statusRes.estimated_remaining);
             }
             if (statusRes.current_step != null) {
-              const idx = steps.findIndex((s) => s.text.includes(statusRes.current_step ?? ""));
+              const idx = steps.findIndex((s) =>
+                s.text.includes(statusRes.current_step ?? ""),
+              );
               if (idx > 0) setCurrentStep(idx);
             }
 
@@ -200,7 +228,7 @@ export default function GeneratingScreen() {
       run();
       return () => {
         cancelledRef.current = true;
-      }
+      };
     }
 
     // walking
@@ -257,9 +285,9 @@ export default function GeneratingScreen() {
           <View style={styles.progressLabels}>
             <Text style={styles.progressText}>{progress}%</Text>
             <Text style={styles.progressText}>
-              {estimatedRemainingSec 
-              ? `완료까지 약 ${estimatedRemainingSec}초` 
-              : `완료까지 약 ${Math.ceil((100 - progress) / 20)}초`}
+              {estimatedRemainingSec
+                ? `완료까지 약 ${estimatedRemainingSec}초`
+                : `완료까지 약 ${Math.ceil((100 - progress) / 20)}초`}
             </Text>
           </View>
         </View>

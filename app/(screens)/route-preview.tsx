@@ -24,6 +24,7 @@ import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { BottomSheet } from "../../components/BottomSheet";
 import { KakaoMap } from "../../components/KakaoMap";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
 import {
   BorderRadius,
   Colors,
@@ -67,6 +68,7 @@ export default function RoutePreviewScreen() {
     (params.shapeIconName as string) || (params.shapeId as string) || "heart";
   const shapeName = (params.shapeName as string) || "하트";
   const savedRouteName = params.routeName as string;
+  const svgPath = params.svgPath as string | undefined;
 
   const generateRouteOptions = (): RouteOption[] => {
     const baseDistance = parseFloat(
@@ -138,27 +140,43 @@ export default function RoutePreviewScreen() {
     routeId ? null : fallbackOptions[1],
   );
 
-  const [optionPlaces, setOptionPlaces] = useState<{ lat: number; lng: number; name: string; category: string }[]>([]);
+  const [optionPlaces, setOptionPlaces] = useState<
+    { lat: number; lng: number; name: string; category: string }[]
+  >([]);
 
   useEffect(() => {
     if (!routeId || !selectedRoute?.optionId) {
       setOptionPlaces([]);
       return;
-    } 
+    }
     let cancelled = false;
     routeApi
       .getOptionPlaces(routeId, selectedRoute.optionId)
       .then((res: unknown) => {
         if (cancelled) return;
-        const data = (res as { data?: { places?: Array<{ lat: number; lng: number; name: string; category: string }>}})?.data;
+        const data = (
+          res as {
+            data?: {
+              places?: Array<{
+                lat: number;
+                lng: number;
+                name: string;
+                category: string;
+              }>;
+            };
+          }
+        )?.data;
         setOptionPlaces(data?.places ?? []);
       })
       .catch(() => setOptionPlaces([]));
-      return () => { cancelled = true; }
+    return () => {
+      cancelled = true;
+    };
   }, [routeId, selectedRoute?.optionId]);
 
   type PlaceMarkerFilter = "all" | "cafe" | "convenience" | "none";
-  const [placeMarkerFilter, setPlaceMarkerFilter] = useState<PlaceMarkerFilter>("all");
+  const [placeMarkerFilter, setPlaceMarkerFilter] =
+    useState<PlaceMarkerFilter>("all");
 
   const filteredPlaceMarkers = (() => {
     if (placeMarkerFilter === "none") return [];
@@ -166,7 +184,8 @@ export default function RoutePreviewScreen() {
       .filter((p) => {
         if (placeMarkerFilter === "all") return true;
         if (placeMarkerFilter === "cafe") return p.category === "cafe";
-        if (placeMarkerFilter === "convenience") return p.category === "convenience";
+        if (placeMarkerFilter === "convenience")
+          return p.category === "convenience";
         return false;
       })
       .map((p) => ({
@@ -349,10 +368,13 @@ export default function RoutePreviewScreen() {
           <TouchableOpacity
             style={[
               styles.placeFilterBtn,
-              placeMarkerFilter === "convenience" && styles.placeFilterBtnActive,
+              placeMarkerFilter === "convenience" &&
+                styles.placeFilterBtnActive,
             ]}
             onPress={() =>
-              setPlaceMarkerFilter((prev) => (prev === "convenience" ? "all" : "convenience"))
+              setPlaceMarkerFilter((prev) =>
+                prev === "convenience" ? "all" : "convenience",
+              )
             }
             activeOpacity={0.7}
           >
@@ -419,8 +441,8 @@ export default function RoutePreviewScreen() {
             </View>
 
             <Text style={styles.modalDescription}>
-              안전점수는 경로 주변의 CCTV와 가로등(보안등) 커버리지를 기반으로
-              계산됩니다.
+              안전점수는 경로 주변의 CCTV와 가로등(보안등) {"\n"}커버리지를
+              기반으로 계산됩니다.
             </Text>
 
             <View style={styles.modalInfoList}>
@@ -443,7 +465,7 @@ export default function RoutePreviewScreen() {
                   ]}
                 />
                 <Text style={styles.modalInfoText}>
-                  CCTV 50m 또는 가로등 15m 이내에 있으면 안전 구간으로
+                  CCTV 50m 또는 가로등 15m 이내에 있으면 {"\n"}안전 구간으로
                   판정합니다
                 </Text>
               </View>
@@ -494,7 +516,13 @@ export default function RoutePreviewScreen() {
                     },
                   ]}
                 >
-                  {isCustomDrawing ? (
+                  {isCustomDrawing && svgPath ? (
+                    <SvgPathIcon
+                      svgPath={svgPath}
+                      size={24}
+                      color={Colors.purple[400]}
+                    />
+                  ) : isCustomDrawing ? (
                     <Sparkles size={24} color={Colors.purple[400]} />
                   ) : (
                     <SvgPathIcon svgPath={iconSvgPath} size={24} color={Colors.emerald[400]} />
@@ -558,7 +586,7 @@ export default function RoutePreviewScreen() {
                       onPress={() => setSafetyInfoVisible(true)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Info size={14} color={Colors.zinc[500]} />
+                      <Info size={20} color={Colors.zinc[500]} />
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.statValue}>{selectedRoute.safety}</Text>
@@ -688,7 +716,7 @@ export default function RoutePreviewScreen() {
                       평탄한 코스 (고도차 {selectedRoute.elevation}m)
                     </Text>
                   </View>
-                  <View style={styles.featureItem}>
+                  {/* <View style={styles.featureItem}>
                     <View
                       style={[
                         styles.featureDot,
@@ -698,7 +726,7 @@ export default function RoutePreviewScreen() {
                     <Text style={styles.featureText}>
                       가로등 밝음 ({selectedRoute.lighting}% 조명)
                     </Text>
-                  </View>
+                  </View> */}
                 </View>
 
                 {/* 주변 편의시설 - half 상태에서도 보이도록 수정 */}
@@ -1034,7 +1062,7 @@ const styles = StyleSheet.create({
   modalInfoItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   modalDot: {
     width: 8,
