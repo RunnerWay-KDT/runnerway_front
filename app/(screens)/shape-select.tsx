@@ -10,27 +10,9 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
 import { getPresetSvgPath, SHAPE_LIST } from "../../constants/presetShapes";
+import { SvgPathIcon } from "../../components/SvgPathIcon";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Heart,
-  Star,
-  Coffee,
-  Smile,
-  Circle,
-  Triangle,
-  Pentagon,
-  Diamond,
-  X, // Cross
-  Shield,
-  Zap,
-  Bookmark,
-  TrendingUp, // For Stairs
-  Dog,
-  Cat,
-  Pencil,
-  Shapes,
-  Check,
-} from "lucide-react-native";
+import { Pencil, Shapes, Check } from "lucide-react-native";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -48,10 +30,9 @@ import { routeApi } from "../../utils/api";
 interface Shape {
   id: string;
   name: string;
-  Icon: React.ElementType;
   iconName: string;
-  distance: string;
   colors: [string, string];
+  svgPath: string;
 }
 
 export default function ShapeSelectScreen() {
@@ -63,29 +44,6 @@ export default function ShapeSelectScreen() {
   const [hasCustomDrawing, setHasCustomDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPathData, setSavedPathData] = useState<string>("");
-
-  // Helper to map icon names (from DB) to Lucide icons
-  const getIconComponent = (iconName: string) => {
-    const map: { [key: string]: any } = {
-        heart: Heart,
-        star: Star,
-        circle: Circle,
-        triangle: Triangle,
-        pentagon: Pentagon,
-        diamond: Diamond,
-        cross: X,
-        shield: Shield,
-        zap: Zap,
-        bookmark: Bookmark,
-        stairs: TrendingUp,
-        coffee: Coffee,
-        smile: Smile,
-        dog: Dog,
-        cat: Cat,
-        default: Shapes
-    };
-    return map[iconName?.toLowerCase()] || map.default;
-  };
 
   // Helper to get colors (can be static or dynamic)
   const getShapeColors = (category: string, index: number): [string, string] => {
@@ -100,7 +58,6 @@ export default function ShapeSelectScreen() {
 
   const allShapes = SHAPE_LIST.map((item, index) => ({
     ...item,
-    Icon: getIconComponent(item.iconName),
     colors: getShapeColors(item.category ?? 'shape', index),
   }));
 
@@ -211,7 +168,6 @@ export default function ShapeSelectScreen() {
             shapeId: selected.id,
             shapeName: selected.name,
             shapeIconName: selected.iconName,
-            shapeDistance: selected.distance,
             startLat: startLat,
             startLng: startLng,
             svgPath: selected.svgPath || getPresetSvgPath(selected.iconName), // Pass Frontend SVG
@@ -225,7 +181,6 @@ export default function ShapeSelectScreen() {
     activeMainTab === "presets" ? !!selectedShape : hasCustomDrawing;
 
   const ShapeCard = ({ shape }: { shape: Shape }) => {
-    const Icon = shape.Icon;
     const isSelected = selectedShape === shape.id;
 
     return (
@@ -241,9 +196,8 @@ export default function ShapeSelectScreen() {
           end={{ x: 1, y: 1 }}
         />
         <View style={styles.shapeContent}>
-          <Icon size={48} color="#fff" strokeWidth={1.5} />
+          <SvgPathIcon svgPath={shape.svgPath} size={48} color="#fff" />
           <Text style={styles.shapeName}>{shape.name}</Text>
-          <Text style={styles.shapeDistance}>예상 {shape.distance}</Text>
         </View>
         {isSelected && (
           <Animated.View
@@ -503,11 +457,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.semibold,
     color: Colors.zinc[50],
     marginTop: Spacing.sm,
-  },
-  shapeDistance: {
-    fontSize: FontSize.sm,
-    color: Colors.zinc[400],
-    marginTop: Spacing.xs,
   },
   checkBadge: {
     position: "absolute",
