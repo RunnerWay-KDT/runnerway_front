@@ -2,7 +2,7 @@ import React from "react";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Flame, Heart, MapPin, TrendingUp, User } from "lucide-react-native";
+import { LineSquiggle, Heart, MapPin, User } from "lucide-react-native";
 import {
   ScrollView,
   StyleSheet,
@@ -48,7 +48,7 @@ export default function HomeScreen() {
       >
         <Animated.View entering={FadeInUp.duration(500)} style={styles.section}>
           <Text style={styles.sectionTitle}>
-            오늘은 어떤 운동을 하시겠어요?
+            오늘은 어떤 경로를 그려볼까요?
           </Text>
 
           <View style={styles.mainButtonsRow}>
@@ -58,18 +58,20 @@ export default function HomeScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/(screens)/location-setup",
-                  params: { workoutType: "running" },
+                  params: { workoutType: "custom" },
                 })
               }
             >
               <LinearGradient
-                colors={[Colors.emerald[500], Colors.emerald[600]]}
+                colors={[Colors.blue[400], Colors.emerald[500]]}
                 style={styles.mainButtonGradient}
               >
-                <Flame size={40} color="#fff" />
+                <LineSquiggle size={50} color="#fff" />
                 <View style={styles.mainButtonTextContainer}>
-                  <Text style={styles.mainButtonTitle}>러닝</Text>
-                  <Text style={styles.mainButtonSubtitle}>컨디션 맞춤</Text>
+                  <Text style={styles.mainButtonTitle}>커스텀</Text>
+                  <Text style={styles.mainButtonSubtitle}>
+                    원하는 모양으로 {"\n"}경로생성
+                  </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -80,24 +82,27 @@ export default function HomeScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/(screens)/location-setup",
-                  params: { workoutType: "walking" },
+                  params: { workoutType: "shape" },
                 })
               }
             >
               <LinearGradient
-                colors={[Colors.blue[500], Colors.blue[600]]}
+                // colors={[Colors.blue[500], Colors.blue[600]]}
+                colors={[Colors.blue[500], Colors.purple[500]]}
                 style={styles.mainButtonGradient}
               >
-                <TrendingUp size={40} color="#fff" />
+                <Heart size={50} color="#fff" />
                 <View style={styles.mainButtonTextContainer}>
-                  <Text style={styles.mainButtonTitle}>산책</Text>
-                  <Text style={styles.mainButtonSubtitle}>여유롭게</Text>
+                  <Text style={styles.mainButtonTitle}>프리셋</Text>
+                  <Text style={styles.mainButtonSubtitle}>
+                    정해진 모양으로 {"\n"}경로생성
+                  </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.shapeButton}
             activeOpacity={0.9}
             onPress={() =>
@@ -121,7 +126,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </LinearGradient>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity
             style={styles.savedRouteButton}

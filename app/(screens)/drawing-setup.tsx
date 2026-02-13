@@ -55,6 +55,7 @@ export default function DrawingSetupScreen() {
           shapeIconName: params.shapeIconName,
           shapeDistance: params.shapeDistance,
           customPath: params.customPath,
+          svgPath: params.customPath, // route-preview에서 사용할 svgPath
           routeId: params.routeId,
           targetDuration: duration.toString(),
           targetDistanceKm: estimatedDistance,
@@ -131,9 +132,9 @@ export default function DrawingSetupScreen() {
         >
           <Text style={styles.infoTitle}>💡 참고 사항</Text>
           <Text style={styles.infoText}>
-            • 실제 소요 시간은 개인의 걸음 속도에 따라 다를 수 있습니다{"\n"}•
-            신호등, 경사도 등 실제 환경에 따라 시간이 달라질 수 있습니다{"\n"}•
-            편안한 페이스로 걷는 것을 권장합니다
+            • 실제 소요 시간은 개인의 걸음 속도에 따라 다를 수 있어요{"\n"}•
+            신호등, 경사도 등 환경에 따라 시간이 달라질 수 있어요{"\n"}• 편안한
+            페이스로 걷는 것을 권장해요
           </Text>
         </Animated.View>
       </ScrollView>

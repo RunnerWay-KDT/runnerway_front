@@ -50,6 +50,11 @@ export default function LocationSetupScreen() {
         pathname: "/(screens)/walking-setup",
         params: navigationParams,
       });
+    } else if (workoutType === "custom") {
+      router.push({
+        pathname: "/(screens)/shape-select",
+        params: { ...navigationParams, initialTab: "draw" },
+      });
     } else if (workoutType === "shape") {
       router.push({
         pathname: "/(screens)/shape-select",
@@ -64,6 +69,8 @@ export default function LocationSetupScreen() {
         return "러닝 출발 위치";
       case "walking":
         return "산책 출발 위치";
+      case "custom":
+        return "커스텀 그리기 출발 위치";
       case "shape":
         return "도형 그리기 출발 위치";
       default:

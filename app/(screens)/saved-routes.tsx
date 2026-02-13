@@ -236,6 +236,8 @@ export default function SavedRoutesScreen() {
         routeId: route.routeId,
         routeOptionId: route.routeOptionId ?? undefined,
         routeName: route.routeName,
+        svgPath: route.svgPath ?? undefined, // 커스텀 경로의 경우 svgPath 전달
+        mode: route.svgPath ? "custom" : undefined, // svgPath가 있으면 커스텀 모드
       },
     });
   };
