@@ -1,15 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { Magnetometer } from "expo-sensors";
-import {
-  Flame,
-  Pause,
-  Play,
-  Square,
-  TrendingUp,
-  Volume2,
-  VolumeX,
-} from "lucide-react-native";
+import { Flame, Pause, Play, Square, TrendingUp } from "lucide-react-native";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 import Animated, {
@@ -46,7 +38,6 @@ export default function WorkoutScreen() {
   const [sheetState, setSheetState] = useState<
     "collapsed" | "half" | "expanded"
   >("collapsed");
-  const [voiceGuide, setVoiceGuide] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<{
     lat: number;
     lng: number;
@@ -469,18 +460,6 @@ export default function WorkoutScreen() {
 
       {/* Top Controls */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => setVoiceGuide(!voiceGuide)}
-          style={styles.headerButton}
-          activeOpacity={0.7}
-        >
-          {voiceGuide ? (
-            <Volume2 size={24} color={Colors.emerald[400]} />
-          ) : (
-            <VolumeX size={24} color={Colors.zinc[500]} />
-          )}
-        </TouchableOpacity>
-
         <View style={styles.remainingContainer}>
           <Text style={styles.remainingLabel}>남은 거리</Text>
           <Text style={styles.remainingValue}>
@@ -493,7 +472,7 @@ export default function WorkoutScreen() {
           style={styles.stopButton}
           activeOpacity={0.7}
         >
-          <Square size={24} color={Colors.red[400]} />
+          <Square size={24} color={Colors.red[500]} />
         </TouchableOpacity>
       </View>
 
@@ -643,20 +622,16 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
     zIndex: 10,
   },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   remainingContainer: {
     alignItems: "center",
+    backgroundColor: Colors.zinc[700],
+    borderRadius: BorderRadius.xl,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   remainingLabel: {
     fontSize: FontSize.sm,
-    color: Colors.zinc[400],
+    color: Colors.zinc[200],
   },
   remainingValue: {
     fontSize: FontSize.xl,
@@ -667,7 +642,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: `${Colors.red[500]}20`,
+    backgroundColor: Colors.zinc[700],
     justifyContent: "center",
     alignItems: "center",
   },

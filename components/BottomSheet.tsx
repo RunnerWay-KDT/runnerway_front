@@ -25,7 +25,7 @@ export function BottomSheet({
   const bottomSheetRef = useRef<GorhomBottomSheet>(null);
 
   // Define snap points (in percentage or absolute values)
-  const snapPoints = useMemo(() => [200, 400, "90%"], []);
+  const snapPoints = useMemo(() => [200, 400, "85%"], []);
 
   // Map snap point indices to state names
   const getStateFromIndex = (index: number): SheetState => {

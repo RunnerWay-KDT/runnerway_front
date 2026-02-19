@@ -401,7 +401,14 @@ export default function RoutePreviewScreen() {
             }
             activeOpacity={0.7}
           >
-            <Text style={styles.placeFilterBtnEmoji}>⊘</Text>
+            <Text
+              style={[
+                styles.placeFilterBtnEmoji,
+                { color: Colors.emerald[400] },
+              ]}
+            >
+              ⊘
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -413,11 +420,13 @@ export default function RoutePreviewScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <ArrowLeft size={24} color={Colors.zinc[900]} />
+          <ArrowLeft size={24} color={Colors.zinc[50]} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {fromSaved ? "저장된 경로" : "경로 선택"}
-        </Text>
+        <View style={styles.headerTitleBox}>
+          <Text style={styles.headerTitle}>
+            {fromSaved ? "저장된 경로" : "경로 선택"}
+          </Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
@@ -811,9 +820,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backgroundColor: Colors.zinc[800],
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerTitleBox: {
+    backgroundColor: Colors.zinc[800],
+    borderRadius: BorderRadius.xl,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   headerTitle: {
     fontSize: FontSize.lg,
@@ -1106,7 +1121,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.92)",
+    backgroundColor: Colors.zinc[800],
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -1119,6 +1134,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.emerald[500],
   },
   placeFilterBtnEmoji: {
-    fontSize: 20,
+    fontSize: 26,
   },
 });
