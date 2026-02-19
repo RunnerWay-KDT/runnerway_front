@@ -25,8 +25,8 @@ export default function LocationPickerMap({
     initialLocation || DEFAULT_LOCATION,
   );
   const [locationError, setLocationError] = useState<string | null>(null);
-  // 지도를 바로 보여주기 위해 GPS 대기 상태를 false로 시작
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  // GPS 위치를 먼저 받아온 후 지도를 렌더링하기 위해 true로 시작
+  const [isGettingLocation, setIsGettingLocation] = useState(!initialLocation);
   const [mapReady, setMapReady] = useState(false);
   const onLocationSelectedRef = useRef(onLocationSelected);
   onLocationSelectedRef.current = onLocationSelected;
@@ -58,7 +58,10 @@ export default function LocationPickerMap({
         const { status } = await Location.requestForegroundPermissionsAsync();
 
         if (status !== "granted") {
-          if (isMounted) setLocationError("위치 권한이 필요합니다");
+          if (isMounted) {
+            setLocationError("위치 권한이 필요합니다");
+            setIsGettingLocation(false);
+          }
           return;
         }
 
@@ -70,7 +73,8 @@ export default function LocationPickerMap({
             lng: lastKnown.coords.longitude,
           };
           setCurrentLocation(quickLocation);
-          movMapCenter(quickLocation.lat, quickLocation.lng);
+          // 캐시된 위치가 있으면 바로 지도 렌더링 시작
+          setIsGettingLocation(false);
           if (onLocationSelectedRef.current) {
             onLocationSelectedRef.current(quickLocation);
           }
@@ -87,6 +91,8 @@ export default function LocationPickerMap({
             lng: location.coords.longitude,
           };
           setCurrentLocation(newLocation);
+          // GPS 위치 획득 후 지도 렌더링 (아직 렌더링 전이었다면)
+          setIsGettingLocation(false);
           movMapCenter(newLocation.lat, newLocation.lng);
           if (onLocationSelectedRef.current) {
             onLocationSelectedRef.current(newLocation);
@@ -97,6 +103,7 @@ export default function LocationPickerMap({
         if (isMounted) {
           // 에러가 발생해도 기본 좌표로 지도는 계속 표시
           setLocationError(null);
+          setIsGettingLocation(false);
         }
       }
     };
@@ -129,10 +136,22 @@ export default function LocationPickerMap({
     }
   };
 
-  // 흔들릴 수 있어서 useMemo 대신 ref로 한 번만 생성
+  // GPS 위치를 확보한 후 HTML을 생성하므로 항상 현재 위치 기준으로 지도가 열림
   const htmlContentRef = useRef<string | null>(null);
-  if (!htmlContentRef.current) {
+  if (!isGettingLocation && !htmlContentRef.current) {
     htmlContentRef.current = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_CONFIG.APP_KEY}"></script><style>*{margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden}#map{width:100%;height:100%}</style></head><body><div id="map"></div><script>let map;let debounceTimer;function initMap(){try{const container=document.getElementById('map');const options={center:new kakao.maps.LatLng(${currentLocation.lat},${currentLocation.lng}),level:3};map=new kakao.maps.Map(container,options);window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapLoaded'}));kakao.maps.event.addListener(map,'idle',function(){const center=map.getCenter();clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){window.ReactNativeWebView.postMessage(JSON.stringify({type:'locationChanged',lat:center.getLat(),lng:center.getLng()}));},300);});}catch(error){window.ReactNativeWebView.postMessage(JSON.stringify({type:'error',message:error.toString()}));}}if(typeof kakao!=='undefined'&&kakao.maps){initMap();}else{document.addEventListener('DOMContentLoaded',function(){setTimeout(initMap,100);});}</script></body></html>`;
+  }
+
+  // GPS 위치 대기 중일 때 로딩 화면 표시
+  if (isGettingLocation) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#4A90E2" />
+          <Text style={styles.overlayText}>현재 위치를 찾고 있습니다...</Text>
+        </View>
+      </View>
+    );
   }
 
   if (locationError) {

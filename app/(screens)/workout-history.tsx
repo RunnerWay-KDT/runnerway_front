@@ -37,7 +37,7 @@ import {
   FontWeight,
   Spacing,
 } from "../../constants/theme";
-import { getPresetSvgPath, SHAPE_LIST } from "../../constants/presetShapes";
+import { getPresetSvgPath } from "../../constants/presetShapes";
 import { workoutApi, savedRouteApi, routeApi } from "../../utils/api";
 import type { WorkoutSummary } from "../../types/api";
 
@@ -64,39 +64,14 @@ interface WorkoutRecord {
 
 /** 백엔드 WorkoutSummary → 프론트 WorkoutRecord 변환 */
 function toWorkoutRecord(w: WorkoutSummary): WorkoutRecord {
-  let routeData = { shapeId: "custom", shapeName: "커스텀", iconName: "heart" };
-
-  // 1) 서버에서 프리셋 도형 정보가 내려온 경우 우선 사용
-  if (w.icon_name) {
-    const matched = SHAPE_LIST.find((s) => s.iconName === w.icon_name);
-    routeData = {
-      shapeId: matched?.id ?? w.icon_name,
-      shapeName: matched?.name ?? w.icon_name,
-      iconName: w.icon_name,
-    };
-  } else if (w.shape_id) {
-    // shape_id로 매칭 (icon_name이 없을 때 펴백)
-    const matched = SHAPE_LIST.find((s) => s.id === w.shape_id);
-    if (matched) {
-      routeData = {
-        shapeId: matched.id,
-        shapeName: matched.name,
-        iconName: matched.iconName,
-      };
-    }
-  } else {
-    // 2) 서버 정보가 없으면 route_name에서 한국어 이름 매칭 (펴백)
-    for (const shape of SHAPE_LIST) {
-      if (w.route_name.includes(shape.name)) {
-        routeData = {
-          shapeId: shape.id,
-          shapeName: shape.name,
-          iconName: shape.iconName,
-        };
-        break;
+  // 백엔드에서 제공하는 shape 정보 우선 사용
+  let routeData = w.shape
+    ? {
+        shapeId: w.shape.shape_id,
+        shapeName: w.shape.shape_name,
+        iconName: w.shape.icon_name,
       }
-    }
-  }
+    : { shapeId: "custom", shapeName: "커스텀", iconName: "heart" };
 
   return {
     id: w.id,
