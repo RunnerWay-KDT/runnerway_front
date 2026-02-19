@@ -283,18 +283,6 @@ export function LiveKakaoMap({
         });
         actualPolyline.setMap(map);
 
-        // 시작점 마커
-        var startMarker = document.createElement('div');
-        startMarker.style.cssText = 'width:30px;height:30px;background:#10b981;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;';
-        startMarker.innerText = 'S';
-
-        var startOverlay = new kakao.maps.CustomOverlay({
-          position: fullPath[0],
-          content: startMarker,
-          zIndex: 10
-        });
-        startOverlay.setMap(map);
-
         // 현재 위치 마커
         var markerContainer = document.createElement('div');
         markerContainer.id = 'currentMarkerContainer';

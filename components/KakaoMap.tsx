@@ -27,7 +27,7 @@ interface KakaoMapProps {
     lng: number;
   }[];
 
-  startPosition?: {lat: number; lng: number;} | null;
+  startPosition?: { lat: number; lng: number } | null;
 
   /** 계획 경로 (route_options.coordinates) - 회색 점선으로 표시 */
   plannedPath?: {
@@ -209,13 +209,21 @@ export function KakaoMap({
 
         // 마커 추가
         ${markers
-          .map(
-            (marker, index) => {
-              const m = marker as { lat: number; lng: number; title?: string; color?: string; icon?: string };
-              const color = m.color || "#6b7280";
-              const emoji = m.icon === "cafe" ? "☕" : m.icon === "convenience" ? "🏪" : "📍";
-              const titleEscaped = (m.title || "").replace(/'/g, "\\'").replace(/</g, "&lt;");
-              return `
+          .map((marker, index) => {
+            const m = marker as {
+              lat: number;
+              lng: number;
+              title?: string;
+              color?: string;
+              icon?: string;
+            };
+            const color = m.color || "#6b7280";
+            const emoji =
+              m.icon === "cafe" ? "☕" : m.icon === "convenience" ? "🏪" : "📍";
+            const titleEscaped = (m.title || "")
+              .replace(/'/g, "\\'")
+              .replace(/</g, "&lt;");
+            return `
           try {
             var pos${index} = new kakao.maps.LatLng(${m.lat}, ${m.lng});
             var circleDiv${index} = document.createElement('div');
@@ -243,8 +251,7 @@ export function KakaoMap({
             sendLog('error', 'Marker ${index} error: ' + e.message);
           }
         `;
-            },
-          )
+          })
           .join("")}
 
         // 경로 폴리라인 추가
@@ -279,17 +286,6 @@ export function KakaoMap({
             plannedPolyline.setMap(map);
             plannedLinePath.forEach(function(point) { bounds.extend(point); });
             sendLog('info', 'Planned path added with ' + plannedLinePath.length + ' points');
-            
-            // 시작점 마커 (계획 경로)
-            var plannedStartDiv = document.createElement('div');
-            plannedStartDiv.style.cssText = 'width:24px;height:24px;background:#a1a1aa;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:11px;';
-            plannedStartDiv.innerText = 'P';
-            var plannedStartOverlay = new kakao.maps.CustomOverlay({
-              position: plannedLinePath[0],
-              content: plannedStartDiv,
-              yAnchor: 0.5
-            });
-            plannedStartOverlay.setMap(map);
           }
           `
               : ""
@@ -318,28 +314,6 @@ export function KakaoMap({
             actualPolyline.setMap(map);
             actualLinePath.forEach(function(point) { bounds.extend(point); });
             sendLog('info', 'Actual path added with ' + actualLinePath.length + ' points');
-            
-            // 시작점 마커 (실제 경로)
-            var actualStartDiv = document.createElement('div');
-            actualStartDiv.style.cssText = 'width:28px;height:28px;background:#10b981;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
-            actualStartDiv.innerText = 'S';
-            var actualStartOverlay = new kakao.maps.CustomOverlay({
-              position: actualLinePath[0],
-              content: actualStartDiv,
-              yAnchor: 0.5
-            });
-            actualStartOverlay.setMap(map);
-            
-            // 끝점 마커 (실제 경로)
-            var actualEndDiv = document.createElement('div');
-            actualEndDiv.style.cssText = 'width:28px;height:28px;background:#f43f5e;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
-            actualEndDiv.innerText = 'E';
-            var actualEndOverlay = new kakao.maps.CustomOverlay({
-              position: actualLinePath[actualLinePath.length - 1],
-              content: actualEndDiv,
-              yAnchor: 0.5
-            });
-            actualEndOverlay.setMap(map);
           }
           `
               : ""
