@@ -31,9 +31,10 @@ import {
   FontWeight,
   Spacing,
 } from "../constants/theme";
+import { getPresetSvgPath } from "../constants/presetShapes";
 import { communityApi } from "../utils/api";
-import { getIconComponent } from "../utils/shapeIcons";
 import { KakaoMap } from "./KakaoMap";
+import { SvgPathIcon } from "./SvgPathIcon";
 
 const { height } = Dimensions.get("window");
 
@@ -78,6 +79,7 @@ interface Post {
   actualPath?: { lat: number; lng: number }[];
   startLatitude?: number;
   startLongitude?: number;
+  svgPath?: string;
 }
 
 interface PostDetailModalProps {
@@ -142,7 +144,10 @@ export function PostDetailModal({
 
   if (!post) return null;
 
-  const RouteIcon = getIconComponent(post.route.iconName);
+  const isCustomRoute = !!post.svgPath;
+  const iconSvgPath = isCustomRoute
+    ? post.svgPath!
+    : getPresetSvgPath(post.route.iconName);
 
   const formatDate = (isoString: string): string => {
     try {
@@ -324,13 +329,19 @@ export function PostDetailModal({
                   <View
                     style={[
                       styles.routeIconContainer,
-                      { backgroundColor: `${Colors.emerald[500]}20` },
+                      {
+                        backgroundColor: isCustomRoute
+                          ? `${Colors.purple[500]}20`
+                          : `${Colors.emerald[500]}20`,
+                      },
                     ]}
                   >
-                    <RouteIcon
-                      size={24}
-                      color={Colors.emerald[400]}
-                      strokeWidth={1.5}
+                    <SvgPathIcon
+                      svgPath={iconSvgPath}
+                      size={32}
+                      color={
+                        isCustomRoute ? Colors.purple[400] : Colors.emerald[400]
+                      }
                     />
                   </View>
                   <View style={styles.routeText}>
