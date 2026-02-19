@@ -52,19 +52,22 @@ export default function ShapeSelectScreen() {
   const [savedPathData, setSavedPathData] = useState<string>("");
 
   // Helper to get colors (can be static or dynamic)
-  const getShapeColors = (category: string, index: number): [string, string] => {
-      // Logic for colors based on category
-      if (category === 'animal') {
-          return [Colors.blue[500], Colors.blue[600]];
-      }
-      // Alternate colors for shapes
-      if (index % 2 === 0) return [Colors.pink[500], Colors.red[500]];
-      return [Colors.amber[500], Colors.orange[500]];
+  const getShapeColors = (
+    category: string,
+    index: number,
+  ): [string, string] => {
+    // Logic for colors based on category
+    if (category === "animal") {
+      return [Colors.blue[500], Colors.blue[600]];
+    }
+    // Alternate colors for shapes
+    if (index % 2 === 0) return [Colors.pink[500], Colors.red[500]];
+    return [Colors.amber[500], Colors.orange[500]];
   };
 
   const allShapes = SHAPE_LIST.map((item, index) => ({
     ...item,
-    colors: getShapeColors(item.category ?? 'shape', index),
+    colors: getShapeColors(item.category ?? "shape", index),
   }));
 
   const shapes = allShapes.filter((s) => s.category === "shape");
@@ -93,14 +96,41 @@ export default function ShapeSelectScreen() {
     setIsSaving(true);
 
     try {
+      // 사용자 현재 위치 결정: params → expo-location fallback
+      let userLat = params.startLat ? parseFloat(params.startLat) : NaN;
+      let userLng = params.startLng ? parseFloat(params.startLng) : NaN;
+
+      if (isNaN(userLat) || isNaN(userLng)) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({});
+            userLat = loc.coords.latitude;
+            userLng = loc.coords.longitude;
+          }
+        } catch (e) {
+          console.warn("현재 위치를 가져오지 못했습니다:", e);
+        }
+      }
+
+      // 위치를 아예 못 가져오면 사용자에게 알림
+      if (isNaN(userLat) || isNaN(userLng)) {
+        Alert.alert(
+          "알림",
+          "현재 위치를 가져올 수 없습니다. 위치 권한을 확인해주세요.",
+        );
+        setIsSaving(false);
+        return;
+      }
+
       // Save to backend
       const response = await routeApi.saveCustomDrawing({
         name: `커스텀 경로 ${new Date().toLocaleString("ko-KR")}`,
         svg_path: pathData,
         location: {
-          latitude: 37.5007, // 역삼역 좌표
-          longitude: 127.0364,
-          address: "서울특별시 강남구 역삼동",
+          latitude: userLat,
+          longitude: userLng,
+          address: "",
         },
         estimated_distance: distanceKm,
       });
@@ -152,7 +182,8 @@ export default function ShapeSelectScreen() {
         // If location is missing from params, try to get current location
         if (!startLat || !startLng) {
           try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
+            const { status } =
+              await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") {
               Alert.alert("알림", "위치 권한이 필요합니다.");
               return;

@@ -147,6 +147,7 @@ export default function GeneratingScreen() {
 
           if (mode === "custom" && params.routeId) {
             body.route_id = params.routeId as string;
+            body.start = { lat: startLat, lng: startLng };
           } else if (mode === "shape" && params.shapeId) {
             const shapeId = params.shapeId as string;
             body.shape_id = params.shapeId as string;
