@@ -549,9 +549,18 @@ export const routeApi = {
   },
 
   async getOptionPlaces(routeId: string, optionId: string) {
-    return apiClient.get<{ success: boolean; data: { places: Array<{ id: string; name: string; category: string; lat: number; lng: number }> } }>(
-      `/api/v1/routes/${routeId}/options/${optionId}/places`
-    );
+    return apiClient.get<{
+      success: boolean;
+      data: {
+        places: Array<{
+          id: string;
+          name: string;
+          category: string;
+          lat: number;
+          lng: number;
+        }>;
+      };
+    }>(`/api/v1/routes/${routeId}/options/${optionId}/places`);
   },
 
   /**
@@ -823,6 +832,7 @@ export const communityApi = {
     shape_id?: string;
     shape_name?: string;
     shape_icon?: string;
+    svg_path?: string;
     distance: number;
     duration: number;
     pace?: string;

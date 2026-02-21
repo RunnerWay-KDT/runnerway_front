@@ -46,6 +46,7 @@ interface FeedPost {
   shape_id?: string | null;
   shape_name?: string | null;
   shape_icon?: string | null;
+  svg_path?: string | null;
   distance: number;
   duration: number;
   pace?: string | null;
@@ -483,6 +484,7 @@ export default function CommunityScreen() {
       : undefined,
     startLatitude: feedPost.start_latitude ?? undefined,
     startLongitude: feedPost.start_longitude ?? undefined,
+    svgPath: feedPost.svg_path ?? undefined,
   });
 
   return (

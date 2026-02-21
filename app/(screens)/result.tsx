@@ -67,6 +67,7 @@ export default function ResultScreen() {
   // 도형 정보
   const shapeId = (params.shapeId as string) || "";
   const shapeName = (params.shapeName as string) || "";
+  const svgPath = (params.svgPath as string) || "";
 
   // 북마크 상태
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -308,6 +309,7 @@ export default function ResultScreen() {
         shape_id: shapeId || undefined,
         shape_name: shapeName || undefined,
         shape_icon: iconName || undefined,
+        svg_path: svgPath || undefined,
         distance: parseFloat(distance),
         duration: time,
         pace: pace || undefined,
