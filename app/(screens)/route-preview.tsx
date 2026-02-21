@@ -313,12 +313,10 @@ export default function RoutePreviewScreen() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "쉬움":
-      case "짧은 코스":
         return { text: Colors.emerald[400], bg: `${Colors.emerald[500]}20` };
       case "보통":
         return { text: Colors.blue[400], bg: `${Colors.blue[500]}20` };
       case "도전":
-      case "긴 코스":
         return { text: Colors.orange[400], bg: `${Colors.orange[500]}20` };
       default:
         return { text: Colors.zinc[400], bg: `${Colors.zinc[500]}20` };
@@ -725,7 +723,13 @@ export default function RoutePreviewScreen() {
                       ]}
                     />
                     <Text style={styles.featureText}>
-                      평탄한 코스 (고도차 {selectedRoute.elevation}m)
+                      {selectedRoute.difficulty === "쉬움"
+                        ? `평탄한 코스 (고도차 ${selectedRoute.elevation}m)`
+                        : selectedRoute.difficulty === "보통"
+                          ? `적당한 오르막 (고도차 ${selectedRoute.elevation}m)`
+                          : selectedRoute.difficulty === "도전"
+                            ? `도전 코스 (고도차 ${selectedRoute.elevation}m)`
+                            : `고도차 ${selectedRoute.elevation}m`}
                     </Text>
                   </View>
                   {/* <View style={styles.featureItem}>
