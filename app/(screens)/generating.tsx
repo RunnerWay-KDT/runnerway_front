@@ -32,8 +32,10 @@ export default function GeneratingScreen() {
   const [estimatedRemainingSec, setEstimatedRemainingSec] = useState<
     number | null
   >(null);
+  const [displayRemainingSec, setDisplayRemainingSec] = useState<number | null>(null);
   const startedRef = useRef(false);
   const cancelledRef = useRef(false);
+  const progressRef = useRef(0);
   const rotation = useSharedValue(0);
 
   // 컴포넌트 마운트/언마운트 시 ref 리셋
@@ -44,6 +46,7 @@ export default function GeneratingScreen() {
     setCurrentStep(0);
     setError(null);
     setEstimatedRemainingSec(null);
+    setDisplayRemainingSec(null);
     return () => {
       cancelledRef.current = true;
       startedRef.current = false;
@@ -60,6 +63,24 @@ export default function GeneratingScreen() {
     { Icon: Shield, text: "안전 점수 계산 중", color: Colors.emerald[400] },
     { Icon: Sparkles, text: "그림 형태 보정 중", color: Colors.purple[400] },
   ];
+
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useEffect(() => {
+    if (progress >= 100) return;
+    const interval = setInterval(() => {
+      setDisplayRemainingSec((prev) => {
+        if (prev === null) return null;
+        if (prev < 100) return Math.max(0, prev - 1);
+        const p = progressRef.current;
+        if (p <= 0) return Math.max(1, Math.ceil(100 - p) / 0.5);
+        return 0;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [progress]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -188,6 +209,11 @@ export default function GeneratingScreen() {
             }
             if (typeof statusRes.estimated_remaining === "number") {
               setEstimatedRemainingSec(statusRes.estimated_remaining);
+              setDisplayRemainingSec((prev) => 
+                prev === null || prev <= 0
+                  ? statusRes.estimated_remaining ?? null
+                  : prev
+              );
             }
             if (statusRes.current_step != null) {
               const idx = steps.findIndex((s) =>
@@ -286,8 +312,8 @@ export default function GeneratingScreen() {
           <View style={styles.progressLabels}>
             <Text style={styles.progressText}>{progress}%</Text>
             <Text style={styles.progressText}>
-              {estimatedRemainingSec
-                ? `완료까지 약 ${estimatedRemainingSec}초`
+              {(displayRemainingSec ?? estimatedRemainingSec) != null
+                ? `완료까지 약 ${displayRemainingSec ?? estimatedRemainingSec}초`
                 : `완료까지 약 ${Math.ceil((100 - progress) / 20)}초`}
             </Text>
           </View>
