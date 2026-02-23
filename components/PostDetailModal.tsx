@@ -144,7 +144,8 @@ export function PostDetailModal({
 
   if (!post) return null;
 
-  const isCustomRoute = !!post.svgPath;
+  // shapeId가 있으면 프리셋 경로, 없으면 커스텀 경로
+  const isCustomRoute = !post.route.shapeId;
   const iconSvgPath = isCustomRoute
     ? post.svgPath!
     : getPresetSvgPath(post.route.iconName);

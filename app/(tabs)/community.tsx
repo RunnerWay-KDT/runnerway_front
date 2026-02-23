@@ -1,14 +1,14 @@
 import {
   ActivityIndicator,
+  FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Bookmark, Heart, MapPin, MessageCircle } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -64,22 +64,216 @@ interface FeedPost {
   created_at: string;
 }
 
+// ============================================
+// 시간 포맷 (컴포넌트 외부 — 참조 안정)
+// ============================================
+const formatTimeAgo = (isoString: string): string => {
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 1) return "방금 전";
+    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    if (diffDays < 7) return `${diffDays}일 전`;
+
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${month}월 ${day}일`;
+  } catch {
+    return "";
+  }
+};
+
+// ============================================
+// 카드 컴포넌트 (컴포넌트 외부 정의 + React.memo)
+// ============================================
+const RouteCard = React.memo(
+  ({
+    post,
+    onPress,
+    onToggleLike,
+    onToggleBookmark,
+  }: {
+    post: FeedPost;
+    onPress: () => void;
+    onToggleLike: () => void;
+    onToggleBookmark: () => void;
+  }) => {
+    // KakaoMap 지연 로딩: 카드가 마운트된 뒤 렌더링하여 초기 로드 차단 방지
+    const [mapReady, setMapReady] = useState(false);
+    useEffect(() => {
+      const timer = setTimeout(() => setMapReady(true), 100);
+      return () => clearTimeout(timer);
+    }, []);
+
+    return (
+      <Animated.View entering={FadeInUp.duration(400)}>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+          <View style={styles.card}>
+            <View style={styles.cardImage}>
+              <View style={styles.mapFill} pointerEvents="none">
+                {mapReady ? (
+                  <KakaoMap
+                    routePath={""}
+                    actualPath={
+                      post.actual_path
+                        ? post.actual_path.map((p) => ({
+                            lat: p.lat,
+                            lng: p.lng,
+                          }))
+                        : []
+                    }
+                    center={
+                      post.start_latitude && post.start_longitude
+                        ? {
+                            lat: post.start_latitude,
+                            lng: post.start_longitude,
+                          }
+                        : post.actual_path && post.actual_path.length > 0
+                          ? {
+                              lat: post.actual_path[0].lat,
+                              lng: post.actual_path[0].lng,
+                            }
+                          : undefined
+                    }
+                  />
+                ) : (
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: Colors.zinc[800],
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <ActivityIndicator size="small" color={Colors.zinc[600]} />
+                  </View>
+                )}
+              </View>
+              <View style={styles.distanceBadge}>
+                <Text style={styles.distanceText}>
+                  {post.distance.toFixed(1)}km
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.bookmarkButton}
+                activeOpacity={0.7}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onToggleBookmark();
+                }}
+              >
+                <Bookmark
+                  size={20}
+                  color={
+                    post.is_bookmarked ? Colors.amber[500] : Colors.zinc[50]
+                  }
+                  fill={post.is_bookmarked ? Colors.amber[500] : "transparent"}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cardContent}>
+              <View style={styles.userRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {post.author.name?.[0] || "?"}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userName}>{post.author.name}</Text>
+                  <Text style={styles.routeName}>
+                    {post.route_name || "러닝 코스"}
+                  </Text>
+                </View>
+                <Text style={styles.timeAgo}>
+                  {formatTimeAgo(post.created_at)}
+                </Text>
+              </View>
+
+              {post.location ? (
+                <View style={styles.locationRow}>
+                  <MapPin size={14} color={Colors.zinc[400]} />
+                  <Text style={styles.locationText}>{post.location}</Text>
+                </View>
+              ) : null}
+
+              {post.caption ? (
+                <Text style={styles.captionText} numberOfLines={2}>
+                  {post.caption}
+                </Text>
+              ) : null}
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onToggleLike();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Heart
+                    size={20}
+                    color={post.is_liked ? Colors.red[500] : Colors.zinc[50]}
+                    fill={post.is_liked ? Colors.red[500] : "transparent"}
+                  />
+                  <Text style={styles.actionText}>{post.like_count}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  activeOpacity={0.7}
+                >
+                  <MessageCircle size={20} color={Colors.zinc[50]} />
+                  <Text style={styles.actionText}>{post.comment_count}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  },
+);
+RouteCard.displayName = "RouteCard";
+
 export default function CommunityScreen() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sortMode, setSortMode] = useState<"latest" | "popular">("popular");
 
+  // 페이지네이션 상태
+  const pageRef = useRef(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // 모달 상태
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
+  // Ref로 최신 상태 참조 (콜백 안정화용)
+  const postsRef = useRef<FeedPost[]>(posts);
+  postsRef.current = posts;
+  const selectedPostRef = useRef<FeedPost | null>(selectedPost);
+  selectedPostRef.current = selectedPost;
+
   // ============================================
-  // 피드 로드
+  // 피드 로드 (페이지네이션 지원)
   // ============================================
   const loadFeed = useCallback(
     async (isRefresh = false) => {
       try {
+        if (isRefresh) {
+          pageRef.current = 1;
+          setHasMore(true);
+        }
         if (!isRefresh) setLoading(true);
 
         const response = await communityApi.getFeed({
@@ -90,8 +284,11 @@ export default function CommunityScreen() {
 
         if (response?.data?.posts) {
           setPosts(response.data.posts);
+          setHasMore(response.data.pagination?.has_next ?? false);
+          pageRef.current = 1;
         } else {
           setPosts([]);
+          setHasMore(false);
         }
       } catch (error) {
         console.error("피드 로드 실패:", error);
@@ -103,6 +300,31 @@ export default function CommunityScreen() {
     [sortMode],
   );
 
+  // 다음 페이지 로드
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = pageRef.current + 1;
+      const response = await communityApi.getFeed({
+        page: nextPage,
+        limit: 20,
+        sort: sortMode === "popular" ? "popular" : "latest",
+      });
+      if (response?.data?.posts?.length) {
+        setPosts((prev) => [...prev, ...response.data.posts]);
+        setHasMore(response.data.pagination?.has_next ?? false);
+        pageRef.current = nextPage;
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("추가 로드 실패:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, sortMode]);
+
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
@@ -113,10 +335,10 @@ export default function CommunityScreen() {
   }, [loadFeed]);
 
   // ============================================
-  // 좋아요 토글
+  // 좋아요 토글 (ref 참조로 의존성 제거 → 콜백 안정)
   // ============================================
-  const toggleLike = async (postId: string) => {
-    const post = posts.find((p) => p.id === postId);
+  const toggleLike = useCallback(async (postId: string) => {
+    const post = postsRef.current.find((p) => p.id === postId);
     if (!post) return;
 
     // Optimistic update
@@ -132,7 +354,7 @@ export default function CommunityScreen() {
       ),
     );
 
-    if (selectedPost?.id === postId) {
+    if (selectedPostRef.current?.id === postId) {
       setSelectedPost((prev) =>
         prev
           ? {
@@ -166,7 +388,7 @@ export default function CommunityScreen() {
             : p,
         ),
       );
-      if (selectedPost?.id === postId) {
+      if (selectedPostRef.current?.id === postId) {
         setSelectedPost((prev) =>
           prev
             ? {
@@ -178,13 +400,13 @@ export default function CommunityScreen() {
         );
       }
     }
-  };
+  }, []);
 
   // ============================================
-  // 북마크 토글
+  // 북마크 토글 (ref 참조로 의존성 제거 → 콜백 안정)
   // ============================================
-  const toggleBookmark = async (postId: string) => {
-    const post = posts.find((p) => p.id === postId);
+  const toggleBookmark = useCallback(async (postId: string) => {
+    const post = postsRef.current.find((p) => p.id === postId);
     if (!post) return;
 
     // Optimistic update
@@ -202,7 +424,7 @@ export default function CommunityScreen() {
       ),
     );
 
-    if (selectedPost?.id === postId) {
+    if (selectedPostRef.current?.id === postId) {
       setSelectedPost((prev) =>
         prev
           ? {
@@ -236,7 +458,7 @@ export default function CommunityScreen() {
             : p,
         ),
       );
-      if (selectedPost?.id === postId) {
+      if (selectedPostRef.current?.id === postId) {
         setSelectedPost((prev) =>
           prev
             ? {
@@ -248,7 +470,7 @@ export default function CommunityScreen() {
         );
       }
     }
-  };
+  }, []);
 
   // ============================================
   // 포스트 선택 (모달 열기)
@@ -260,154 +482,40 @@ export default function CommunityScreen() {
 
   const handleCloseModal = () => {
     setIsModalVisible(false);
-    loadFeed(true);
     setSelectedPost(null);
+    // 모달에서 변경된 좋아요/북마크 상태는 이미 optimistic update로 반영됨
+    // 댓글 수만 백그라운드 동기화 (전체 피드 재로드 제거)
   };
 
   // ============================================
-  // 시간 포맷
+  // FlatList renderItem
   // ============================================
-  const formatTimeAgo = (isoString: string): string => {
-    try {
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const renderItem = useCallback(
+    ({ item }: { item: FeedPost }) => (
+      <RouteCard
+        post={item}
+        onPress={() => handlePostPress(item)}
+        onToggleLike={() => toggleLike(item.id)}
+        onToggleBookmark={() => toggleBookmark(item.id)}
+      />
+    ),
+    [toggleLike, toggleBookmark],
+  );
 
-      if (diffMinutes < 1) return "방금 전";
-      if (diffMinutes < 60) return `${diffMinutes}분 전`;
-      if (diffHours < 24) return `${diffHours}시간 전`;
-      if (diffDays < 7) return `${diffDays}일 전`;
+  const keyExtractor = useCallback((item: FeedPost) => item.id, []);
 
-      const month = date.getMonth() + 1;
-      const day = date.getDate();
-      return `${month}월 ${day}일`;
-    } catch {
-      return "";
-    }
-  };
-
-  // ============================================
-  // 카드 컴포넌트
-  // ============================================
-  const RouteCard = ({ post }: { post: FeedPost }) => (
-    <Animated.View entering={FadeInUp.duration(400)}>
-      <TouchableOpacity
-        onPress={() => handlePostPress(post)}
-        activeOpacity={0.9}
-      >
-        <View style={styles.card}>
-          <View style={styles.cardImage}>
-            <View style={styles.mapFill} pointerEvents="none">
-              <KakaoMap
-                routePath={""}
-                actualPath={
-                  post.actual_path
-                    ? post.actual_path.map((p) => ({
-                        lat: p.lat,
-                        lng: p.lng,
-                      }))
-                    : []
-                }
-                center={
-                  post.start_latitude && post.start_longitude
-                    ? {
-                        lat: post.start_latitude,
-                        lng: post.start_longitude,
-                      }
-                    : post.actual_path && post.actual_path.length > 0
-                      ? {
-                          lat: post.actual_path[0].lat,
-                          lng: post.actual_path[0].lng,
-                        }
-                      : undefined
-                }
-              />
-            </View>
-            <View style={styles.distanceBadge}>
-              <Text style={styles.distanceText}>
-                {post.distance.toFixed(1)}km
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.bookmarkButton}
-              activeOpacity={0.7}
-              onPress={(e) => {
-                e.stopPropagation();
-                toggleBookmark(post.id);
-              }}
-            >
-              <Bookmark
-                size={20}
-                color={post.is_bookmarked ? Colors.amber[500] : Colors.zinc[50]}
-                fill={post.is_bookmarked ? Colors.amber[500] : "transparent"}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.cardContent}>
-            <View style={styles.userRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {post.author.name?.[0] || "?"}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>{post.author.name}</Text>
-                <Text style={styles.routeName}>
-                  {post.route_name || "러닝 코스"}
-                </Text>
-              </View>
-              <Text style={styles.timeAgo}>
-                {formatTimeAgo(post.created_at)}
-              </Text>
-            </View>
-
-            {post.location ? (
-              <View style={styles.locationRow}>
-                <MapPin size={14} color={Colors.zinc[400]} />
-                <Text style={styles.locationText}>{post.location}</Text>
-              </View>
-            ) : null}
-
-            {post.caption ? (
-              <Text style={styles.captionText} numberOfLines={2}>
-                {post.caption}
-              </Text>
-            ) : null}
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  toggleLike(post.id);
-                }}
-                activeOpacity={0.7}
-              >
-                <Heart
-                  size={20}
-                  color={post.is_liked ? Colors.red[500] : Colors.zinc[50]}
-                  fill={post.is_liked ? Colors.red[500] : "transparent"}
-                />
-                <Text style={styles.actionText}>{post.like_count}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                <MessageCircle size={20} color={Colors.zinc[50]} />
-                <Text style={styles.actionText}>{post.comment_count}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+  const ListFooter = useCallback(
+    () =>
+      loadingMore ? (
+        <View style={{ paddingVertical: 20, alignItems: "center" }}>
+          <ActivityIndicator size="small" color={Colors.emerald[500]} />
         </View>
-      </TouchableOpacity>
-    </Animated.View>
+      ) : null,
+    [loadingMore],
   );
 
   // ============================================
-  // 피드 리스트 렌더링
+  // 피드 리스트 렌더링 (FlatList + 가상화)
   // ============================================
   const renderFeed = () => {
     if (loading) {
@@ -432,7 +540,10 @@ export default function CommunityScreen() {
     }
 
     return (
-      <ScrollView
+      <FlatList
+        data={posts}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -443,11 +554,15 @@ export default function CommunityScreen() {
             colors={[Colors.emerald[500]]}
           />
         }
-      >
-        {posts.map((post) => (
-          <RouteCard key={post.id} post={post} />
-        ))}
-      </ScrollView>
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={ListFooter}
+        // 가상화 최적화: 화면 밖 카드는 렌더링하지 않음
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews={true}
+      />
     );
   };
 
