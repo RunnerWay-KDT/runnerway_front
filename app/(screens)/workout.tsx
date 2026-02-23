@@ -293,7 +293,7 @@ export default function WorkoutScreen() {
       const rawPoint = { lat: newCoords.latitude, lng: newCoords.longitude };
       let smoothedPoint: { lat: number; lng: number } | null = null;
       
-      if (workoutPolyline.length > 0) {
+      if (workoutPolyline.length < 2) {
         smoothedPoint = rawPoint;
       } else {
         const segIdx = getNearestSegmentIndex(rawPoint, workoutPolyline);
@@ -303,15 +303,9 @@ export default function WorkoutScreen() {
         const hasTwo = coords.length >= 2;
 
         if (isStraight && hasTwo) {
-          const prev = {
-            lat: coords[coords.length - 2].latitude,
-            lng: coords[coords.length - 2].longitude,
-          };
-          const last = {
-            lat: coords[coords.length - 1].latitude,
-            lng: coords[coords.length - 1].longitude,
-          };
-          smoothedPoint = projectPointOntoLine(rawPoint, prev, last);
+          const segStart = workoutPolyline[segIdx];
+          const segEnd = workoutPolyline[segIdx + 1];
+          smoothedPoint = projectPointOntoLine(rawPoint, segStart, segEnd);
         } else{
           smoothedPoint = smoothPointEMA(rawPoint, lastSmoothed.current);
         }
