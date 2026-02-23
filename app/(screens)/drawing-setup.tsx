@@ -121,7 +121,7 @@ export default function DrawingSetupScreen() {
               <Text style={styles.distanceUnit}>km</Text>
             </View>
             <Text style={styles.distanceDescription}>
-              시속 4km 기준으로 계산된 예상 거리입니다
+              시속 5km 기준으로 계산된 예상 거리입니다
             </Text>
           </View>
         </Animated.View>
