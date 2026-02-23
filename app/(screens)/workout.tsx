@@ -63,6 +63,7 @@ export default function WorkoutScreen() {
   const pathUpdateCounter = useRef(0);
   const lastSplitDistance = useRef(0);
   const lastSplitTime = useRef(0);
+  const lastSmoothed = useRef<({ lat: number; lng: number }) | null>(null);
 
   const targetDistance = parseFloat((params.targetDistance as string) || "4.2");
   const iconName = (params.shapeIconName as string) || "heart";
@@ -165,20 +166,14 @@ export default function WorkoutScreen() {
     return R * c; // 미터 단위
   }
 
-  // 목표 경로 polyline: [{ lat, lng }, ...]
-  // point: { lat, lng } (또는 latitude, longitude)
-  // 반환: polyline 위에서 point에 가장 가까운 { lat, lng } (haversine 기준)
-  function snapPointToPolyline(
+  // polyline에서 point에 가장 가까운 선분 인덱스 (0 ~ length-2)
+  function getNearestSegmentIndex(
     point: { lat: number; lng: number },
     polyline: { lat: number; lng: number }[],
-  ): { lat: number; lng: number } {
-    if (!polyline?.length) return point;
-    if (polyline.length === 1) return polyline[0];
-
-    let bestLat = point.lat;
-    let bestLng = point.lng;
+  ): number {
+    if (!polyline || polyline.length < 2) return 0;
+    let bestIdx = 0;
     let bestDistM = Infinity;
-
     for (let i = 0; i < polyline.length - 1; i++) {
       const a = polyline[i];
       const b = polyline[i + 1];
@@ -192,27 +187,71 @@ export default function WorkoutScreen() {
 
       // 선분이 점이면 거리 계산 생략
       if (segLenSq < 1e-18) {
-        const  d = haversineMeters(py, px, ay, ax);
+        const d = haversineMeters(py, px, ay, ax);
         if (d < bestDistM) {
           bestDistM = d;
-          bestLat = ay;
-          bestLng = ax;
+          bestIdx = i;
         }
         continue;
       }
-
-      let t = (apx * abx + apy * aby) / segLenSq;
-      t = Math.max(0, Math.min(1, t));
-      const closestLng = ax + t * abx;
-      const closestLat = ay + t * aby;
-      const d = haversineMeters(px, py, closestLat, closestLng);
+      const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / segLenSq));
+      const clng = ax + t * abx, clat = ay + t * aby;
+      const d = haversineMeters(px, py, clat, clng);
       if (d < bestDistM) {
         bestDistM = d;
-        bestLat = closestLat;
-        bestLng = closestLng;
+        bestIdx = i;
       }
     }
-    return { lat: bestLat, lng: bestLng };
+    return bestIdx;
+  }
+
+  // 해당 선분 인덱스에서 경로가 얼마나 꺽이는지 각도(도)로 반환. 작을 수록 직선에 가까움.
+  function getLocalAngleDeg(
+    polyline: { lat: number; lng: number }[],
+    segmentIdx: number,
+  ): number {
+    if (!polyline || polyline.length < 3) return 0;
+    const i = Math.max(0, Math.min(segmentIdx, polyline.length - 2)); // 선분 인덱스 제한
+    const p0 = polyline[i];
+    const p1 = polyline[i + 1];
+    const p2 = i + 2 < polyline.length ? polyline[i + 2] : p1;
+    const d1x = p1.lng - p0.lng, d1y = p1.lat - p0.lat;
+    const d2x = p2.lng - p1.lng, d2y = p2.lat - p1.lat;
+    const a1 = Math.atan2(d1y, d1x); // 라디안으로 각도 계산
+    const a2 = Math.atan2(d2y, d2x);
+    let deg = (Math.abs(a2 - a1) * 180) / Math.PI; // 라디안을 각도로 반환
+    if (deg > 180) deg = 360 - deg;
+    return deg;
+  }
+
+  // 점을 직선 (lineA, lineB) 위에 투영한 좌표
+  function projectPointOntoLine(
+    point: { lat: number; lng: number },
+    lineA: { lat: number; lng: number },
+    lineB: { lat: number; lng: number },
+  ): { lat: number; lng: number } {
+    const ax = lineA.lng; const ay = lineA.lat;
+    const bx = lineB.lng; const by = lineB.lat;
+    const px = point.lng; const py = point.lat;
+    const abx = bx - ax, aby = by - ay;
+    const apx = px - ax, apy = py - ay;
+    const segLenSq = abx * abx + aby * aby;
+    const t = (apx * abx + apy * aby) / segLenSq;
+    return { lat: ay + t * aby, lng: ax + t * abx };
+  }
+
+  const SMOOTH_ALPHA = 0.4;
+  const STRAIGHT_ANGLE_THRESHOLD = 18; // 18도 이하면 직선으로 간주
+
+  function smoothPointEMA(
+    raw: { lat: number; lng: number },
+    last: { lat: number; lng: number } | null,
+  ): { lat: number; lng: number } {
+    if (!last) return raw;
+    return {
+      lat: SMOOTH_ALPHA * raw.lat + (1 - SMOOTH_ALPHA) * last.lat,
+      lng: SMOOTH_ALPHA * raw.lng + (1 - SMOOTH_ALPHA) * last.lng,
+    };
   }
 
   // Haversine 공식으로 두 좌표 간 거리 계산 (미터)
@@ -250,20 +289,40 @@ export default function WorkoutScreen() {
         heading: prev?.heading, // 기존 heading 유지
       }));
 
-      // 경로에 좌표 추가
+      // 경로에 좌표 추가: 그리미 경로 직선 구간은 직선 보정, 곡선 구간은 EMA로 완만하게
+      const rawPoint = { lat: newCoords.latitude, lng: newCoords.longitude };
+      let smoothedPoint: { lat: number; lng: number } | null = null;
+      
       if (workoutPolyline.length > 0) {
-        const snapped = snapPointToPolyline(
-          { lat: newCoords.latitude, lng: newCoords.longitude },
-          workoutPolyline,
-        );
-        routeCoordinates.current.push({
-          latitude: snapped.lat,
-          longitude: snapped.lng,
-          timestamp: newCoords.timestamp,
-        });
+        smoothedPoint = rawPoint;
       } else {
-        routeCoordinates.current.push(newCoords);
+        const segIdx = getNearestSegmentIndex(rawPoint, workoutPolyline);
+        const angleDeg = getLocalAngleDeg(workoutPolyline, segIdx);
+        const isStraight = angleDeg < STRAIGHT_ANGLE_THRESHOLD;
+        const coords = routeCoordinates.current;
+        const hasTwo = coords.length >= 2;
+
+        if (isStraight && hasTwo) {
+          const prev = {
+            lat: coords[coords.length - 2].latitude,
+            lng: coords[coords.length - 2].longitude,
+          };
+          const last = {
+            lat: coords[coords.length - 1].latitude,
+            lng: coords[coords.length - 1].longitude,
+          };
+          smoothedPoint = projectPointOntoLine(rawPoint, prev, last);
+        } else{
+          smoothedPoint = smoothPointEMA(rawPoint, lastSmoothed.current);
+        }
       }
+
+      lastSmoothed.current = smoothedPoint;
+      routeCoordinates.current.push({
+        latitude: smoothedPoint.lat,
+        longitude: smoothedPoint.lng,
+        timestamp: newCoords.timestamp,
+      })
 
       // 5개의 좌표마다 actualRoute 업데이트 (성능 최적화)
       pathUpdateCounter.current += 1;
@@ -282,8 +341,8 @@ export default function WorkoutScreen() {
         const distanceInMeters = calculateDistance(
           lastLocation.current.latitude,
           lastLocation.current.longitude,
-          newCoords.latitude,
-          newCoords.longitude,
+          smoothedPoint.lat,
+          smoothedPoint.lng,
         );
 
         // 거리가 너무 크면 (50m 이상) GPS 오류로 간주하고 무시
@@ -344,7 +403,11 @@ export default function WorkoutScreen() {
         }
       }
 
-      lastLocation.current = newCoords;
+      lastLocation.current = {
+        latitude: smoothedPoint.lat,
+        longitude: smoothedPoint.lng,
+        timestamp: newCoords.timestamp,
+      };
     },
     [calculateDistance],
   );
