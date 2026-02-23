@@ -149,6 +149,72 @@ export default function WorkoutScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function haversineMeters(
+    lat1: number, lon1: number, lat2: number, lon2: number,
+  ): number {
+    const R = 6371e3; // 지구 반지름 (미터)
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a = 
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + 
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // 미터 단위
+  }
+
+  // 목표 경로 polyline: [{ lat, lng }, ...]
+  // point: { lat, lng } (또는 latitude, longitude)
+  // 반환: polyline 위에서 point에 가장 가까운 { lat, lng } (haversine 기준)
+  function snapPointToPolyline(
+    point: { lat: number; lng: number },
+    polyline: { lat: number; lng: number }[],
+  ): { lat: number; lng: number } {
+    if (!polyline?.length) return point;
+    if (polyline.length === 1) return polyline[0];
+
+    let bestLat = point.lat;
+    let bestLng = point.lng;
+    let bestDistM = Infinity;
+
+    for (let i = 0; i < polyline.length - 1; i++) {
+      const a = polyline[i];
+      const b = polyline[i + 1];
+      const ax = a.lng, ay = a.lat;
+      const bx = b.lng, by = b.lat;
+      const px = point.lng, py = point.lat;
+
+      const abx = bx - ax, aby = by - ay;
+      const apx = px - ax, apy = py - ay;
+      const segLenSq = abx * abx + aby * aby;
+
+      // 선분이 점이면 거리 계산 생략
+      if (segLenSq < 1e-18) {
+        const  d = haversineMeters(py, px, ay, ax);
+        if (d < bestDistM) {
+          bestDistM = d;
+          bestLat = ay;
+          bestLng = ax;
+        }
+        continue;
+      }
+
+      let t = (apx * abx + apy * aby) / segLenSq;
+      t = Math.max(0, Math.min(1, t));
+      const closestLng = ax + t * abx;
+      const closestLat = ay + t * aby;
+      const d = haversineMeters(px, py, closestLat, closestLng);
+      if (d < bestDistM) {
+        bestDistM = d;
+        bestLat = closestLat;
+        bestLng = closestLng;
+      }
+    }
+    return { lat: bestLat, lng: bestLng };
+  }
+
   // Haversine 공식으로 두 좌표 간 거리 계산 (미터)
   const calculateDistance = useCallback(
     (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -185,7 +251,19 @@ export default function WorkoutScreen() {
       }));
 
       // 경로에 좌표 추가
-      routeCoordinates.current.push(newCoords);
+      if (workoutPolyline.length > 0) {
+        const snapped = snapPointToPolyline(
+          { lat: newCoords.latitude, lng: newCoords.longitude },
+          workoutPolyline,
+        );
+        routeCoordinates.current.push({
+          latitude: snapped.lat,
+          longitude: snapped.lng,
+          timestamp: newCoords.timestamp,
+        });
+      } else {
+        routeCoordinates.current.push(newCoords);
+      }
 
       // 5개의 좌표마다 actualRoute 업데이트 (성능 최적화)
       pathUpdateCounter.current += 1;
