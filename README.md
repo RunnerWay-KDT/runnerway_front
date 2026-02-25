@@ -1,143 +1,132 @@
-# Runner Way - 러닝 경로 생성 앱 🏃‍♂️
+# 🏃 Runner Way
 
-React Native와 Expo를 사용하여 만든 AI 기반 러닝 경로 생성 애플리케이션입니다.
-이 프로젝트 구조와 관련 기술의 자세한 내용은 GUIDE.md 를 참고하세요
-이 파일은 ai의 도움을 받아 생성되었습니다.
-테스트용 문장입니다.
+AI 기반 러닝 경로 생성 모바일 앱입니다.  
+원하는 모양(하트, 별, 물고기 등)으로 GPS 아트 러닝 경로를 만들고, 실시간으로 운동을 추적할 수 있습니다.
 
-## 시작하기
-
-1. 의존성 패키지 설치
-
-   ```bash
-   npm install
-   ```
-
-2. 앱 실행
-
-   ```bash
-   npx expo start
-   ```
-
-실행 후 다음 옵션으로 앱을 열 수 있습니다:
-
-- [개발 빌드](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android 에뮬레이터](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS 시뮬레이터](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go) - 빠른 개발 및 테스트용
-
-**app** 디렉토리 안의 파일을 수정하여 개발을 시작할 수 있습니다. 이 프로젝트는 [파일 기반 라우팅](https://docs.expo.dev/router/introduction)을 사용합니다.
+---
 
 ## 주요 기능
 
-### 인증
+- **경로 생성** — 프리셋 도형 선택 또는 직접 그리기로 나만의 러닝 경로 생성
+- **실시간 운동 추적** — 거리, 시간, 페이스, 칼로리를 실시간 측정
+- **카카오맵 연동** — 지도 위에 경로를 시각화하고 실시간 위치 표시
+- **커뮤니티** — 다른 사용자와 경로를 공유하고, 좋아요·댓글·북마크
+- **프로필 & 기록** — 운동 히스토리 관리 및 저장된 경로 모아보기
 
-- 로그인 / 회원가입
-- 사용자 프로필 관리
+---
 
-### 러닝 경로 생성
+## 기술 스택
 
-- **도형/동물 프리셋**: 하트, 별, 강아지 등 다양한 모양의 경로 선택
-- **직접 그리기**: 손가락으로 원하는 경로를 직접 그려서 생성
-- **AI 경로 최적화**: 현재 위치에서 가장 안전하고 아름다운 경로 자동 생성
+| 구분       | 기술                                      |
+| ---------- | ----------------------------------------- |
+| 프레임워크 | React Native 0.81 + Expo SDK 54           |
+| 라우팅     | Expo Router (파일 기반)                   |
+| 언어       | TypeScript                                |
+| 상태 관리  | React Context API                         |
+| 애니메이션 | React Native Reanimated                   |
+| 지도       | Kakao Maps (WebView)                      |
+| UI         | lucide-react-native, expo-linear-gradient |
+| 스타일링   | StyleSheet (Emerald + Zinc 다크 테마)     |
 
-### 운동 추적
-
-- 실시간 거리, 시간, 페이스 측정
-- 칼로리 소모량 계산
-- 라이브 지도 추적
-
-### 커뮤니티
-
-- 다른 러너들의 경로 공유
-- 인기 경로 탐색
+---
 
 ## 프로젝트 구조
 
 ```
-runnerway/
-├── app/
-│   ├── (auth)/          # 인증 관련 화면 (로그인, 회원가입)
-│   ├── (tabs)/          # 탭 네비게이션 화면 (홈, 커뮤니티, 프로필)
-│   ├── (screens)/       # 기타 화면들
-│   │   ├── running-setup.tsx
-│   │   ├── walking-setup.tsx
-│   │   ├── shape-select.tsx
-│   │   ├── generating.tsx
-│   │   ├── route-preview.tsx
-│   │   └── workout.tsx
-│   └── _layout.tsx      # 루트 레이아웃
-├── components/          # 재사용 가능한 컴포넌트
-│   ├── BottomSheet.tsx
-│   ├── DrawingCanvas.tsx
-│   ├── MapMock.tsx
-│   ├── PrimaryButton.tsx
-│   └── ScreenHeader.tsx
-├── constants/           # 테마 및 상수
-│   └── theme.ts
-└── contexts/            # React Context (인증 등)
-    └── AuthContext.tsx
+app/
+  (auth)/        # 로그인, 회원가입
+  (tabs)/         # 탭 네비게이션 (홈, 커뮤니티, 마이)
+  (screens)/      # 기능 화면들
+    shape-select    - 도형 선택 / 직접 그리기
+    location-setup  - 출발 위치 설정
+    running-setup   - 러닝 설정
+    walking-setup   - 걷기 설정
+    drawing-setup   - 그리기 경로 설정
+    route-preview   - 경로 미리보기
+    generating      - 경로 생성 중 로딩
+    workout         - 실시간 운동 화면
+    result          - 운동 결과
+    workout-history - 운동 기록
+    saved-routes    - 저장된 경로
+    profile-edit    - 프로필 수정
+    safety-settings - 안전 설정
+components/        # 재사용 컴포넌트
+constants/         # 테마, API 설정, 프리셋 도형
+contexts/          # AuthContext (인증 상태 관리)
+utils/             # API 통신 유틸리티
+types/             # TypeScript 타입 정의
 ```
 
-## 기술 스택
+---
 
-- **프레임워크**: React Native, Expo SDK 54
-- **내비게이션**: Expo Router (파일 기반 라우팅)
-- **애니메이션**: React Native Reanimated 4.1.1
-- **제스처**: React Native Gesture Handler 2.28.0
-- **UI 라이브러리**:
-  - @gorhom/bottom-sheet (바텀시트)
-  - react-native-svg (SVG 렌더링)
-  - lucide-react-native (아이콘)
-- **그래픽**: Expo Linear Gradient
+## 시작하기
 
-## 개발 가이드
+### 사전 요구사항
 
-### 새 화면 추가하기
+- Node.js 18 이상
+- Expo CLI (`npm install -g expo-cli`)
+- Android/iOS 에뮬레이터 또는 Expo Go 앱
 
-1. `app/(screens)/` 디렉토리에 새 파일 생성 (예: `new-screen.tsx`)
-2. 자동으로 `/new-screen` 경로로 접근 가능
+### 설치 및 실행
 
-### 컴포넌트 개발
+```bash
+# 의존성 설치
+npm install
 
-모든 공통 컴포넌트는 `components/` 디렉토리에 위치합니다:
+# 개발 서버 시작
+npm start
 
-```tsx
-import { PrimaryButton } from "../../components/PrimaryButton";
-import { ScreenHeader } from "../../components/ScreenHeader";
+# 플랫폼별 실행
+npm run android
+npm run ios
+npm run web
 ```
 
-### 테마 사용
+### 환경 변수 설정
 
-`constants/theme.ts`에서 일관된 디자인 시스템을 제공합니다:
+프로젝트 루트에 `.env` 파일을 생성하고 아래 항목을 설정합니다.
 
-```tsx
-import { Colors, FontSize, Spacing, BorderRadius } from "../constants/theme";
+```env
+EXPO_PUBLIC_API_BASE_URL=http://localhost:8000
+EXPO_PUBLIC_KAKAO_MAP_APP_KEY=your_kakao_javascript_key
+EXPO_PUBLIC_KAKAO_REST_API_KEY=your_kakao_rest_api_key
 ```
 
-## 알려진 이슈 및 해결
+---
 
-### iOS에서 BottomSheet가 튕기는 문제
+## API 연동
 
-- ✅ 해결됨: `@gorhom/bottom-sheet` 라이브러리 사용으로 안정화
+백엔드 API 엔드포인트 구조:
 
-### DrawingCanvas Reanimated 경고
+| 도메인    | 주요 엔드포인트                                                  |
+| --------- | ---------------------------------------------------------------- |
+| 인증      | `/api/v1/auth/login`, `signup`, `logout`, `refresh`              |
+| 사용자    | `/api/v1/users/me`                                               |
+| 경로 생성 | `/api/v1/routes/generate-gps-art`, `custom-drawing`, `recommend` |
+| 운동      | `/api/v1/workouts/start`, `complete`, `pause`, `resume`          |
+| 커뮤니티  | `/api/v1/community/feed`, `posts`, 좋아요/댓글/북마크            |
+| 저장 경로 | `/api/v1/users/me/saved-routes`                                  |
 
-- ✅ 해결됨: `pathData.value`를 worklet 내부에서 안전하게 처리
+---
 
-## 더 알아보기
+## 화면 흐름
 
-Expo 개발에 대해 더 알아보려면:
-
-- [Expo 공식 문서](https://docs.expo.dev/)
-- [Expo Router 가이드](https://docs.expo.dev/router/introduction/)
-- [React Native 공식 문서](https://reactnative.dev/)
-
-## 커뮤니티
-
-- [Expo GitHub](https://github.com/expo/expo)
-- [Discord 커뮤니티](https://chat.expo.dev)
-
-## 라이센스
-
-이 프로젝트는 교육 및 포트폴리오 목적으로 제작되었습니다.
+```
+로그인/회원가입
+      ↓
+   홈 (탭)  ←→  커뮤니티 (탭)  ←→  마이 (탭)
+      ↓
+  도형 선택 / 직접 그리기
+      ↓
+  출발 위치 설정
+      ↓
+  러닝/걷기 설정
+      ↓
+  경로 생성 (AI)
+      ↓
+  경로 미리보기
+      ↓
+  실시간 운동
+      ↓
+  운동 결과
+```
